@@ -1,0 +1,6 @@
+{
+  "name": "Business Growth & Export Hub",
+  "description": "Mobile-first business services platform providing small businesses, freelancers, startups, and exporters with SEO, social media, export intelligence, and business planning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
