@@ -37,43 +37,43 @@ const CANDIDATE_MODELS = [
 const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://businesshub.vercel.app/</loc>
+    <loc>https://md-soyeb.vercel.app/</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://businesshub.vercel.app/export</loc>
+    <loc>https://md-soyeb.vercel.app/export</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://businesshub.vercel.app/seo</loc>
+    <loc>https://md-soyeb.vercel.app/seo</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://businesshub.vercel.app/social</loc>
+    <loc>https://md-soyeb.vercel.app/social</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://businesshub.vercel.app/business</loc>
+    <loc>https://md-soyeb.vercel.app/business</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://businesshub.vercel.app/pricing</loc>
+    <loc>https://md-soyeb.vercel.app/pricing</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://businesshub.vercel.app/dashboard</loc>
+    <loc>https://md-soyeb.vercel.app/dashboard</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -86,7 +86,7 @@ User-agent: *
 Allow: /
 
 # Sitemap Reference
-Sitemap: https://businesshub.vercel.app/sitemap.xml
+Sitemap: https://md-soyeb.vercel.app/sitemap.xml
 `;
 
 // Direct SEO sitemap and robots endpoints (returns HTTP 200 with appropriate mime type)

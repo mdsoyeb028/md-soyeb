@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 
 # Sitemap Reference
-Sitemap: https://businesshub.vercel.app/sitemap.xml
+Sitemap: https://md-soyeb.vercel.app/sitemap.xml
