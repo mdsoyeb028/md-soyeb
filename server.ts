@@ -27,6 +27,40 @@ const getGeminiClient = () => {
   });
 };
 
+// Candidate models with fast lite first to prevent 503 high-demand spike errors
+const CANDIDATE_MODELS = [
+  "gemini-3.1-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
+];
+
+async function generateWithGemini(
+  prompt: string,
+  options?: { jsonMode?: boolean }
+): Promise<string | null> {
+  const ai = getGeminiClient();
+  if (!ai) return null;
+
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        ...(options?.jsonMode ? { config: { responseMimeType: "application/json" } } : {}),
+      });
+
+      if (response && response.text) {
+        return response.text;
+      }
+    } catch {
+      // If a model is experiencing high demand (e.g. 503) or rate limits, smoothly try the next model
+      continue;
+    }
+  }
+
+  return null;
+}
+
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -45,10 +79,7 @@ app.post("/api/ai/assistant", async (req, res) => {
       return;
     }
 
-    const ai = getGeminiClient();
-    if (ai) {
-      try {
-        const prompt = `You are a world-class senior international trade advisor and business strategist for the "Business Growth & Export Hub".
+    const prompt = `You are a world-class senior international trade advisor and business strategist for the "Business Growth & Export Hub".
 User inquiry: "${query}"
 
 Provide a structured, deeply practical response formatted strictly with the following clear markdown sections:
@@ -73,21 +104,13 @@ Provide a structured, deeply practical response formatted strictly with the foll
 ### ⚖️ Regulatory & Legal Advisory Notice
 *General guidance disclaimer: All international trade, tariff, tax, customs, and legal information provided is for educational and strategic guidance. Users must verify current requirements and regulatory filings with national export promotion councils, customs authorities, or certified legal/tax trade professionals.*`;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-        });
-
-        if (response.text) {
-          res.json({ content: response.text, source: "gemini-ai" });
-          return;
-        }
-      } catch (geminiErr) {
-        console.warn("Gemini call failed, using intelligent fallback:", geminiErr);
-      }
+    const aiContent = await generateWithGemini(prompt);
+    if (aiContent) {
+      res.json({ content: aiContent, source: "gemini-ai" });
+      return;
     }
 
-    // High quality intelligent fallback if Gemini key is not configured or fails
+    // High quality intelligent fallback if Gemini key is not configured or all models busy
     const fallbackResponse = `### 1. 🎯 Possible Target Markets & Demand Analysis
 * **United States & Canada:** Huge demand for artisan craftsmanship, sustainable goods, and niche consumer products. High purchasing power with willingness to pay premium margins for authentic handmade provenance.
 * **European Union (Germany, France, Netherlands):** Strong interest in eco-friendly packaging, ethical sourcing, and Fair Trade certified products.
@@ -136,27 +159,25 @@ app.post("/api/ai/export", async (req, res) => {
   try {
     const { productName, productCategory, targetCountry, budget, quantity, businessType, subTool } = req.body;
 
-    const ai = getGeminiClient();
-    if (ai) {
-      let prompt = "";
-      if (subTool === "buyer-message") {
-        prompt = `Draft a high-converting, professional B2B export buyer introduction message/email.
+    let prompt = "";
+    if (subTool === "buyer-message") {
+      prompt = `Draft a high-converting, professional B2B export buyer introduction message/email.
 Product: ${productName || "General Goods"}
 Category: ${productCategory || "Commercial"}
 Target Market: ${targetCountry || "Global"}
 Business Type: ${businessType || "Exporter"}
 Include: Professional subject line, FOB/CIF terms mention, USP highlight, invitation for catalog/sample dispatch, and clear call-to-action.`;
-      } else if (subTool === "product-description") {
-        prompt = `Create an export-grade B2B international product description and catalog specification sheet for:
+    } else if (subTool === "product-description") {
+      prompt = `Create an export-grade B2B international product description and catalog specification sheet for:
 Product: ${productName || "Specialty Item"}
 Category: ${productCategory || "Manufactured Goods"}
 Include: Technical specifications, materials, packaging dimensions, minimum order quantity (MOQ), quality compliance notes, and HS Code recommendation notes.`;
-      } else if (subTool === "export-checklist") {
-        prompt = `Provide a comprehensive, sequential Export Readiness & Documentation Checklist for:
+    } else if (subTool === "export-checklist") {
+      prompt = `Provide a comprehensive, sequential Export Readiness & Documentation Checklist for:
 Product: ${productName || "Export Goods"} to Target Country: ${targetCountry || "International"}.
 Include: Legal licenses, product lab testings, packaging/labeling, shipping documents (Commercial Invoice, Packing List, Certificate of Origin, Bill of Lading, Marine Insurance), and customs declaration steps.`;
-      } else {
-        prompt = `Analyze export opportunities for the following business parameters:
+    } else {
+      prompt = `Analyze export opportunities for the following business parameters:
 Product Name: ${productName}
 Category: ${productCategory}
 Target Country: ${targetCountry}
@@ -171,21 +192,12 @@ Provide structured output with:
 4. Recommended Incoterms & Payment Security
 5. Suggested Next Steps
 Clearly state that all trade opportunities are strategic AI-generated estimates and require local market verification.`;
-      }
+    }
 
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-        });
-
-        if (response.text) {
-          res.json({ content: response.text, source: "gemini-ai" });
-          return;
-        }
-      } catch (geminiErr) {
-        console.warn("Gemini export call failed, using trade fallback:", geminiErr);
-      }
+    const aiText = await generateWithGemini(prompt);
+    if (aiText) {
+      res.json({ content: aiText, source: "gemini-ai" });
+      return;
     }
 
     // Default curated response
@@ -212,9 +224,7 @@ app.post("/api/ai/seo", async (req, res) => {
       return;
     }
 
-    const ai = getGeminiClient();
-    if (ai) {
-      const prompt = `Conduct a comprehensive SEO audit and strategy blueprint for the website: "${url}" with target niche/keyword: "${keyword || 'General'}".
+    const prompt = `Conduct a comprehensive SEO audit and strategy blueprint for the website: "${url}" with target niche/keyword: "${keyword || 'General'}".
 Format as JSON with keys:
 {
   "score": number between 65 and 94,
@@ -227,26 +237,14 @@ Format as JSON with keys:
   "suggestions": [ { "priority": "Critical" | "High" | "Medium", "title": string, "action": string } ]
 }`;
 
+    const aiJson = await generateWithGemini(prompt, { jsonMode: true });
+    if (aiJson) {
       try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-          },
-        });
-
-        if (response.text) {
-          try {
-            const parsed = JSON.parse(response.text);
-            res.json({ ...parsed, source: "gemini-ai" });
-            return;
-          } catch {
-            // fallback to standard json
-          }
-        }
-      } catch (geminiErr) {
-        console.warn("Gemini SEO call failed, using engine fallback:", geminiErr);
+        const parsed = JSON.parse(aiJson);
+        res.json({ ...parsed, source: "gemini-ai" });
+        return;
+      } catch {
+        // proceed to fallback
       }
     }
 
@@ -292,9 +290,7 @@ app.post("/api/ai/social", async (req, res) => {
   try {
     const { platform, business, audience, contentType } = req.body;
 
-    const ai = getGeminiClient();
-    if (ai) {
-      const prompt = `You are a social media marketing expert for small businesses and exporters.
+    const prompt = `You are a social media marketing expert for small businesses and exporters.
 Platform: ${platform || 'Instagram'}
 Business / Product: ${business || 'Craft exports'}
 Target Audience: ${audience || 'Wholesalers & direct consumers'}
@@ -312,26 +308,14 @@ Return a structured JSON with:
   ]
 }`;
 
+    const aiJson = await generateWithGemini(prompt, { jsonMode: true });
+    if (aiJson) {
       try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-          },
-        });
-
-        if (response.text) {
-          try {
-            const parsed = JSON.parse(response.text);
-            res.json({ ...parsed, source: "gemini-ai" });
-            return;
-          } catch {
-            // fallback
-          }
-        }
-      } catch (geminiErr) {
-        console.warn("Gemini Social call failed, using fallback:", geminiErr);
+        const parsed = JSON.parse(aiJson);
+        res.json({ ...parsed, source: "gemini-ai" });
+        return;
+      } catch {
+        // fallback
       }
     }
 
@@ -390,27 +374,16 @@ app.post("/api/ai/business", async (req, res) => {
   try {
     const { toolType, inputData } = req.body;
 
-    const ai = getGeminiClient();
-    if (ai) {
-      const prompt = `You are a startup advisor and commercial growth strategist for small enterprises.
+    const prompt = `You are a startup advisor and commercial growth strategist for small enterprises.
 Tool requested: ${toolType}
 User input details: ${JSON.stringify(inputData)}
 
 Generate an exceptional, comprehensive, actionable response tailored for this tool. Use clear headings, bullet points, and practical metrics. Avoid vague generalities.`;
 
-      try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: prompt,
-        });
-
-        if (response.text) {
-          res.json({ content: response.text, source: "gemini-ai" });
-          return;
-        }
-      } catch (geminiErr) {
-        console.warn("Gemini business call failed, using strategist fallback:", geminiErr);
-      }
+    const aiText = await generateWithGemini(prompt);
+    if (aiText) {
+      res.json({ content: aiText, source: "gemini-ai" });
+      return;
     }
 
     // Default business generator outputs based on toolType
