@@ -34,6 +34,72 @@ const CANDIDATE_MODELS = [
   "gemini-flash-latest",
 ];
 
+const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://businesshub.vercel.app/</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://businesshub.vercel.app/export</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://businesshub.vercel.app/seo</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://businesshub.vercel.app/social</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://businesshub.vercel.app/business</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://businesshub.vercel.app/pricing</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://businesshub.vercel.app/dashboard</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>
+`;
+
+const ROBOTS_TXT = `# robots.txt for Business Growth & Export Hub
+User-agent: *
+Allow: /
+
+# Sitemap Reference
+Sitemap: https://businesshub.vercel.app/sitemap.xml
+`;
+
+// Direct SEO sitemap and robots endpoints (returns HTTP 200 with appropriate mime type)
+app.get("/sitemap.xml", (_req, res) => {
+  res.header("Content-Type", "application/xml; charset=utf-8");
+  res.status(200).send(SITEMAP_XML);
+});
+
+app.get("/robots.txt", (_req, res) => {
+  res.header("Content-Type", "text/plain; charset=utf-8");
+  res.status(200).send(ROBOTS_TXT);
+});
+
 async function generateWithGemini(
   prompt: string,
   options?: { jsonMode?: boolean }

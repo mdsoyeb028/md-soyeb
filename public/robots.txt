@@ -1,0 +1,6 @@
+# robots.txt for Business Growth & Export Hub
+User-agent: *
+Allow: /
+
+# Sitemap Reference
+Sitemap: https://businesshub.vercel.app/sitemap.xml
