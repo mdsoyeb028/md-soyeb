@@ -320,47 +320,133 @@ Generate optimized meta title and meta description recommendations for this exac
 
 // 3. Social Media Content Generation Engine
 app.post("/api/ai/social", async (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
   try {
-    const { platform, business, audience, contentType } = req.body;
+    const { platform, business, category, audience, topic, language, contentType } = req.body || {};
 
     if (!business || typeof business !== "string" || !business.trim()) {
-      res.status(400).json({ error: "Business or product description is required." });
+      res.status(400).json({ 
+        success: false, 
+        error: "Business or brand name is required." 
+      });
       return;
     }
 
-    const prompt = `You are a world-class social media marketing strategist for small businesses, manufacturers, and exporters.
-Platform: ${platform || "Instagram"}
-Business / Product: ${business.trim()}
-Target Audience: ${audience ? audience.trim() : "B2B Wholesalers & Global Consumers"}
-Content Focus: ${contentType ? contentType.trim() : "High-converting Reels, Behind-the-Scenes & Educational"}
+    if (business.length > 300) {
+      res.status(400).json({ 
+        success: false, 
+        error: "Business name exceeds 300 characters limit." 
+      });
+      return;
+    }
 
-Generate tailored, viral-ready social media content formatted strictly as JSON with this exact schema:
+    const selectedPlatform = platform && ["Instagram", "Facebook", "YouTube", "LinkedIn"].includes(platform) ? platform : "Instagram";
+    const selectedLanguage = language && typeof language === "string" && language.trim() ? language.trim() : "English";
+    const selectedCategory = category && typeof category === "string" && category.trim() ? category.trim() : "General Commerce / Services";
+    const selectedAudience = audience && typeof audience === "string" && audience.trim() ? audience.trim() : "B2B Wholesalers & Global Consumers";
+    const selectedTopic = topic && typeof topic === "string" && topic.trim() ? topic.trim() : "Brand Growth & Product Value";
+    const selectedContentType = contentType && typeof contentType === "string" && contentType.trim() ? contentType.trim() : "Short Videos, Carousels & Thought Leadership";
+
+    const prompt = `You are a world-class senior social media marketing director and copywriter.
+Brand / Business Name: "${business.trim()}"
+Industry / Category: "${selectedCategory}"
+Target Audience: "${selectedAudience}"
+Primary Platform Focus: "${selectedPlatform}"
+Content Topic / Focus: "${selectedTopic}"
+Language: "${selectedLanguage}"
+Content Style / Type: "${selectedContentType}"
+
+CRITICAL INSTRUCTIONS:
+- You must generate REAL, compelling marketing content, actionable video storyboards, engaging copy, and verified hashtag structures.
+- Do NOT generate fake metrics, fabricated follower counts, estimated likes/views/engagement numbers, simulated customers, projected revenue figures, or false viral guarantees.
+- Ensure the language of all written text and captions is in: ${selectedLanguage}.
+
+Generate content formatted strictly as valid JSON adhering to this exact schema:
 {
+  "platform": "${selectedPlatform}",
+  "businessName": "${business.trim()}",
+  "category": "${selectedCategory}",
+  "topic": "${selectedTopic}",
+  "language": "${selectedLanguage}",
   "postIdeas": [
-    { "hook": string, "description": string, "format": string }
+    { "hook": "string", "description": "string", "format": "Carousel | Single Image | Video | Text Post" },
+    { "hook": "string", "description": "string", "format": "Carousel | Single Image | Video | Text Post" },
+    { "hook": "string", "description": "string", "format": "Carousel | Single Image | Video | Text Post" }
   ],
   "reelIdeas": [
-    { "visual": string, "audioHook": string, "onScreenText": string }
+    { "visual": "Detailed visual storyboard scene-by-scene", "audioHook": "Specific audio or voiceover cue", "onScreenText": "Exact text overlay" },
+    { "visual": "Detailed visual storyboard scene-by-scene", "audioHook": "Specific audio or voiceover cue", "onScreenText": "Exact text overlay" }
   ],
   "captions": [
-    { "headline": string, "body": string, "cta": string }
+    { "headline": "string", "body": "multi-line caption body formatted with line breaks", "cta": "compelling call to action" },
+    { "headline": "string", "body": "multi-line caption body formatted with line breaks", "cta": "compelling call to action" }
   ],
-  "hashtags": string[],
-  "videoHooks": string[],
+  "platformDeliverables": {
+    "instagram": {
+      "caption": "ready to post caption with linebreaks",
+      "reelHook": "first 3 seconds video hook"
+    },
+    "facebook": {
+      "postContent": "conversational post fostering community comments",
+      "engagementQuestion": "provocative discussion prompt for readers"
+    },
+    "youtube": {
+      "videoTitle": "high CTR, SEO optimized YouTube video title under 65 chars",
+      "videoDescription": "structured YouTube description with timestamp outline and links",
+      "shortsIdea": "fast-paced vertical video concept for YouTube Shorts",
+      "searchTags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
+    },
+    "linkedin": {
+      "thoughtLeadershipPost": "insightful B2B industry analysis post with executive tone",
+      "keyTakeaway": "core executive lesson in 1 sentence"
+    }
+  },
+  "hashtags": [
+    "#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5",
+    "#hashtag6", "#hashtag7", "#hashtag8", "#hashtag9", "#hashtag10",
+    "#hashtag11", "#hashtag12"
+  ],
+  "videoHooks": [
+    "Punchy hook 1",
+    "Punchy hook 2",
+    "Punchy hook 3"
+  ],
+  "ctaSuggestions": [
+    "Call to action 1",
+    "Call to action 2",
+    "Call to action 3"
+  ],
   "calendar": [
-    { "day": string, "theme": string, "content": string, "bestTime": string }
+    { "day": "Monday", "theme": "string", "content": "string", "bestTime": "string e.g. 09:00 AM" },
+    { "day": "Tuesday", "theme": "string", "content": "string", "bestTime": "string e.g. 12:30 PM" },
+    { "day": "Wednesday", "theme": "string", "content": "string", "bestTime": "string e.g. 05:00 PM" },
+    { "day": "Thursday", "theme": "string", "content": "string", "bestTime": "string e.g. 10:00 AM" },
+    { "day": "Friday", "theme": "string", "content": "string", "bestTime": "string e.g. 02:00 PM" },
+    { "day": "Saturday", "theme": "string", "content": "string", "bestTime": "string e.g. 08:30 AM" },
+    { "day": "Sunday", "theme": "string", "content": "string", "bestTime": "string e.g. 06:00 PM" }
   ]
-}
-
-Ensure 3 postIdeas, 2 reelIdeas, 2 full captions, 10-14 niche hashtags, 3 video hooks, and a 7-day calendar (Monday to Sunday).`;
+}`;
 
     const aiJson = await generateWithGemini(prompt, { jsonMode: true });
     const parsed = JSON.parse(aiJson);
-    res.json({ ...parsed, source: "gemini-ai" });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...parsed,
+        source: "gemini-ai",
+      },
+      ...parsed,
+      source: "gemini-ai",
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Social media generation failed.";
     console.error("Social API error:", message);
-    res.status(503).json({ error: message });
+    const status = message.includes("required") || message.includes("exceeds") ? 400 : 503;
+    res.status(status).json({ 
+      success: false, 
+      error: message 
+    });
   }
 });
 

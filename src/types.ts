@@ -74,6 +74,11 @@ export interface SeoAnalysisResult {
 }
 
 export interface SocialMediaResult {
+  platform: string;
+  businessName: string;
+  category?: string;
+  topic?: string;
+  language?: string;
   postIdeas: Array<{
     hook: string;
     description: string;
@@ -89,8 +94,29 @@ export interface SocialMediaResult {
     body: string;
     cta: string;
   }>;
+  platformDeliverables?: {
+    instagram?: {
+      caption: string;
+      reelHook: string;
+    };
+    facebook?: {
+      postContent: string;
+      engagementQuestion: string;
+    };
+    youtube?: {
+      videoTitle: string;
+      videoDescription: string;
+      shortsIdea: string;
+      searchTags: string[];
+    };
+    linkedin?: {
+      thoughtLeadershipPost: string;
+      keyTakeaway: string;
+    };
+  };
   hashtags: string[];
   videoHooks: string[];
+  ctaSuggestions: string[];
   calendar: Array<{
     day: string;
     theme: string;
