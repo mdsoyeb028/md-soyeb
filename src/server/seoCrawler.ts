@@ -212,51 +212,42 @@ async function safeFetchWebpage(targetUrl: URL): Promise<{
         continue;
       }
 
-      // Check status
-      if (!response.ok && response.status !== 304) {
-        throw new Error(`Target webpage returned HTTP error status ${response.status} (${response.statusText}).`);
-      }
-
       // Read response body with maximum limit (2.5 MB)
+      let text = "";
       const reader = response.body?.getReader();
       if (!reader) {
-        const text = await response.text();
-        return {
-          html: text,
-          statusCode: response.status,
-          responseTimeMs,
-          finalUrl: currentUrl.toString(),
-          pageSizeBytes: Buffer.byteLength(text, "utf-8"),
-          isHttps: currentUrl.protocol === "https:",
-        };
-      }
+        text = await response.text();
+      } else {
+        const chunks: Uint8Array[] = [];
+        let totalBytes = 0;
+        const MAX_BYTES = 2.5 * 1024 * 1024;
 
-      const chunks: Uint8Array[] = [];
-      let totalBytes = 0;
-      const MAX_BYTES = 2.5 * 1024 * 1024;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) {
-          chunks.push(value);
-          totalBytes += value.length;
-          if (totalBytes > MAX_BYTES) {
-            reader.cancel();
-            break;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            totalBytes += value.length;
+            if (totalBytes > MAX_BYTES) {
+              reader.cancel();
+              break;
+            }
           }
         }
+        text = Buffer.concat(chunks).toString("utf-8");
       }
 
-      const fullBuffer = Buffer.concat(chunks);
-      const htmlText = fullBuffer.toString("utf-8");
+      // If status is an error and no HTML/content was returned, throw clear error
+      if (!response.ok && response.status !== 304 && (!text || text.trim().length === 0)) {
+        throw new Error(`Target webpage returned HTTP error status ${response.status} (${response.statusText}) with empty content.`);
+      }
 
       return {
-        html: htmlText,
+        html: text,
         statusCode: response.status,
         responseTimeMs,
         finalUrl: currentUrl.toString(),
-        pageSizeBytes: totalBytes,
+        pageSizeBytes: Buffer.byteLength(text, "utf-8"),
         isHttps: currentUrl.protocol === "https:",
       };
     } finally {
@@ -490,6 +481,15 @@ export async function performRealSeoAudit(targetUrlInput: string, targetKeyword?
 
   // Generate Prioritized Suggestions from ACTUAL detected data
   const suggestions: Array<{ priority: "Critical" | "High" | "Medium"; title: string; action: string }> = [];
+
+  if (fetchResult.statusCode !== 200 && fetchResult.statusCode !== 304) {
+    score = Math.max(10, score - 30);
+    suggestions.unshift({
+      priority: "Critical",
+      title: `Server HTTP ${fetchResult.statusCode} Response Code`,
+      action: `The target server returned HTTP status ${fetchResult.statusCode} instead of HTTP 200 OK. Search engine crawlers (Googlebot, Bingbot) will not index pages that return ${fetchResult.statusCode} challenge or error statuses.`,
+    });
+  }
 
   if (!fetchResult.isHttps) {
     suggestions.push({

@@ -46,14 +46,17 @@ function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): v
 app.use(rateLimitMiddleware);
 
 // Periodic cleanup of rate limiter map
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of ipRequestCounts.entries()) {
-    if (now > record.resetAt) {
-      ipRequestCounts.delete(ip);
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+  const timer = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, record] of ipRequestCounts.entries()) {
+      if (now > record.resetAt) {
+        ipRequestCounts.delete(ip);
+      }
     }
-  }
-}, 5 * 60 * 1000);
+  }, 5 * 60 * 1000);
+  timer.unref?.();
+}
 
 // Initialize Gemini Client safely
 const getGeminiClient = () => {
@@ -242,15 +245,22 @@ Provide a structured, deeply practical response formatted strictly with the foll
 
 // 2. Real SEO Audit Endpoint (Live Crawler + HTML Parser + Mathematical Score)
 app.post("/api/ai/seo", async (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
   try {
-    const { url, keyword } = req.body;
+    const { url, keyword } = req.body || {};
     if (!url || typeof url !== "string" || !url.trim()) {
-      res.status(400).json({ error: "A valid website URL is required (e.g., https://example.com)." });
+      res.status(400).json({ 
+        success: false, 
+        error: "A valid website URL is required (e.g., https://example.com)." 
+      });
       return;
     }
 
     if (url.length > 500) {
-      res.status(400).json({ error: "URL length exceeds 500 characters." });
+      res.status(400).json({ 
+        success: false, 
+        error: "URL length exceeds 500 characters." 
+      });
       return;
     }
 
@@ -292,12 +302,19 @@ Generate optimized meta title and meta description recommendations for this exac
       }
     }
 
-    res.json(auditResult);
+    res.status(200).json({
+      success: true,
+      audit: auditResult,
+      ...auditResult,
+    });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "SEO audit failed.";
+    const message = err instanceof Error ? err.message : "SEO audit could not be completed.";
     console.error("SEO Audit Error:", message);
     const status = message.includes("SSRF") || message.includes("Invalid URL") || message.includes("empty") ? 400 : 502;
-    res.status(status).json({ error: message });
+    res.status(status).json({ 
+      success: false, 
+      error: message 
+    });
   }
 });
 
@@ -460,6 +477,24 @@ Be rigorous, realistic, and commercially sound. Do not invent fake statistics or
     console.error("Business API error:", message);
     res.status(503).json({ error: message });
   }
+});
+
+// Catch-all for undefined /api routes: ALWAYS return JSON, never HTML
+app.all("/api/*", (req, res) => {
+  res.status(404).setHeader("Content-Type", "application/json; charset=utf-8").json({
+    success: false,
+    error: `API route ${req.method} ${req.originalUrl} not found.`,
+  });
+});
+
+// Global API error handler: ALWAYS return JSON, never HTML
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("Unhandled API error:", err);
+  const message = err instanceof Error ? err.message : "Internal server error";
+  res.status(500).setHeader("Content-Type", "application/json; charset=utf-8").json({
+    success: false,
+    error: message,
+  });
 });
 
 // Vite middleware for dev / static serving for prod

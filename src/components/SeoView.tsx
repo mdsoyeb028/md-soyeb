@@ -43,17 +43,33 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
     try {
       const res = await fetch("/api/ai/seo", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({ url: url.trim(), keyword: targetKeyword.trim() }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || `Server responded with status ${res.status}`);
+      // Defensive check: Verify response content-type before parsing JSON to prevent "Unexpected token '<'"
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const rawText = await res.text();
+        const snippet = rawText.slice(0, 100).replace(/<[^>]*>/g, "").trim();
+        throw new Error(
+          `The server returned a non-JSON response (HTTP ${res.status}). ${
+            snippet ? `Detail: "${snippet}"` : "The SEO audit endpoint may be temporarily unreachable."
+          }`
+        );
       }
 
-      setSeoData(data);
+      const data = await res.json();
+
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || `SEO audit could not be completed (HTTP ${res.status}).`);
+      }
+
+      const auditData: SeoAnalysisResult = data.audit || data;
+      setSeoData(auditData);
     } catch (err: unknown) {
       console.error("SEO Audit Error:", err);
       const msg = err instanceof Error ? err.message : "Failed to audit website. Please check the URL and try again.";
