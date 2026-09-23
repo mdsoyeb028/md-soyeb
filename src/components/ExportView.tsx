@@ -14,7 +14,9 @@ import {
   Layers,
   DollarSign,
   TrendingUp,
-  ArrowUpRight
+  ArrowUpRight,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { SavedItem } from "../types";
 
@@ -34,6 +36,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
   const [businessType, setBusinessType] = useState("Manufacturer / Artisan Exporter");
 
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resultContent, setResultContent] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -57,6 +60,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
   const handleRunExportAction = async (forcedTool?: string) => {
     const toolToRun = forcedTool || activeSubTool;
     setIsLoading(true);
+    setErrorMessage(null);
     setResultContent(null);
     setSaved(false);
 
@@ -75,12 +79,17 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
         }),
       });
 
-      if (!res.ok) throw new Error("Export engine call failed");
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Server responded with status ${res.status}`);
+      }
+
       setResultContent(data.content || "Report generated successfully.");
-    } catch (err) {
-      console.error(err);
-      setResultContent("Network error. Please try generating your export research again.");
+    } catch (err: unknown) {
+      console.error("Export Action Error:", err);
+      const msg = err instanceof Error ? err.message : "Failed to generate export strategy.";
+      setErrorMessage(msg);
+      setResultContent(null); // Never replace failed real requests with fake data
     } finally {
       setIsLoading(false);
     }
@@ -312,6 +321,26 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
                 </span>
               </>
             )}
+          </button>
+        </div>
+      )}
+
+      {/* Error Alert Banner */}
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-rose-200 backdrop-blur-xl space-y-2">
+          <div className="flex items-center gap-2 font-bold text-sm text-rose-300">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>Export Intelligence Unavailable</span>
+          </div>
+          <p className="text-xs text-rose-200/90 leading-relaxed">
+            {errorMessage}
+          </p>
+          <button
+            onClick={() => handleRunExportAction()}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-white text-xs font-semibold border border-rose-700 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Action</span>
           </button>
         </div>
       )}

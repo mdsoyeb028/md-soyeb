@@ -13,7 +13,9 @@ import {
   Copy, 
   BookmarkCheck, 
   Loader2,
-  Check
+  Check,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { SavedItem } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
@@ -36,6 +38,7 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
   const [wholesaleDiscount, setWholesaleDiscount] = useState(30);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [resultText, setResultText] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
@@ -53,6 +56,7 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
 
   const handleRunTool = async () => {
     setIsLoading(true);
+    setErrorMessage(null);
     setResultText(null);
     setHasSaved(false);
 
@@ -65,6 +69,7 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
         margin: targetMargin,
         retailPrice,
         wholesalePrice,
+        fobExportPrice,
       };
     } else {
       inputData = {
@@ -86,12 +91,17 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
         }),
       });
 
-      if (!res.ok) throw new Error("Business API call failed");
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Server responded with status ${res.status}`);
+      }
+
       setResultText(data.content || "Business brief generated.");
-    } catch (err) {
-      console.error(err);
-      setResultText("Network error. Please try generating your business brief again.");
+    } catch (err: unknown) {
+      console.error("Business tool error:", err);
+      const msg = err instanceof Error ? err.message : "Failed to generate business blueprint.";
+      setErrorMessage(msg);
+      setResultText(null); // Never replace failed real requests with fake data
     } finally {
       setIsLoading(false);
     }
@@ -325,6 +335,26 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
           )}
         </button>
       </div>
+
+      {/* Error Alert Banner */}
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-rose-200 backdrop-blur-xl space-y-2">
+          <div className="flex items-center gap-2 font-bold text-sm text-rose-300">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>Commercial Strategy Unavailable</span>
+          </div>
+          <p className="text-xs text-rose-200/90 leading-relaxed">
+            {errorMessage}
+          </p>
+          <button
+            onClick={handleRunTool}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-white text-xs font-semibold border border-rose-700 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Operation</span>
+          </button>
+        </div>
+      )}
 
       {/* Result Output Card */}
       {resultText && (

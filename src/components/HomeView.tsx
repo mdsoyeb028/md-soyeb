@@ -12,7 +12,9 @@ import {
   BookmarkCheck, 
   CornerDownLeft, 
   Loader2,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { ActiveTab, SavedItem } from "../types";
 import { QUICK_PROMPTS } from "../data/mockData";
@@ -26,6 +28,7 @@ interface HomeViewProps {
 export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) => {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [responseContent, setResponseContent] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
@@ -35,6 +38,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
     if (!promptToUse.trim() || isLoading) return;
 
     setIsLoading(true);
+    setErrorMessage(null);
     setResponseContent(null);
     setHasSaved(false);
 
@@ -45,15 +49,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
         body: JSON.stringify({ query: promptToUse }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error("Failed to consult trade engine");
+        throw new Error(data.error || `Server responded with status ${res.status}`);
       }
 
-      const data = await res.json();
-      setResponseContent(data.content || "No advice generated. Please try again.");
-    } catch (err) {
-      console.error(err);
-      setResponseContent("Network error. Please try asking your trade advisor again.");
+      setResponseContent(data.content || "Strategic roadmap generated.");
+    } catch (err: unknown) {
+      console.error("AI Assistant error:", err);
+      const msg = err instanceof Error ? err.message : "AI Trade Advisor failed to process inquiry.";
+      setErrorMessage(msg);
+      setResponseContent(null); // Never replace failed real requests with fake data
     } finally {
       setIsLoading(false);
     }
@@ -244,6 +250,26 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
           </div>
         </div>
       </section>
+
+      {/* Error Alert Banner */}
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-rose-200 backdrop-blur-xl space-y-2">
+          <div className="flex items-center gap-2 font-bold text-sm text-rose-300">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>Consultation Unavailable</span>
+          </div>
+          <p className="text-xs text-rose-200/90 leading-relaxed">
+            {errorMessage}
+          </p>
+          <button
+            onClick={() => handleAskAI()}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-white text-xs font-semibold border border-rose-700 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Consultation</span>
+          </button>
+        </div>
+      )}
 
       {/* AI Assistant Output Card (if generated) */}
       {responseContent && (

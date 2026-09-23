@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { ActiveTab, SavedItem } from "./types";
 import { INITIAL_SAVED_ITEMS } from "./data/mockData";
+import { 
+  loadSavedItems, 
+  saveReportItem, 
+  deleteReportItem,
+  getOrCreateUserId 
+} from "./services/storageService";
 import { BackgroundElements } from "./components/BackgroundElements";
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
@@ -16,41 +22,28 @@ import { CheckCircle2 } from "lucide-react";
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [savedItems, setSavedItems] = useState<SavedItem[]>(() => {
-    try {
-      const stored = localStorage.getItem("bge_saved_items");
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error("Failed to load saved items from local storage", e);
-    }
+    const existing = loadSavedItems();
+    if (existing.length > 0) return existing;
     return INITIAL_SAVED_ITEMS;
   });
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Sync to local storage
+  // Ensure client user ID is initialized
   useEffect(() => {
-    try {
-      localStorage.setItem("bge_saved_items", JSON.stringify(savedItems));
-    } catch (e) {
-      console.error("Failed to persist saved items", e);
-    }
-  }, [savedItems]);
+    getOrCreateUserId();
+  }, []);
 
   const handleSaveItem = (itemData: Omit<SavedItem, "id" | "createdAt">) => {
-    const newItem: SavedItem = {
-      ...itemData,
-      id: `saved-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    setSavedItems((prev) => [newItem, ...prev]);
-    showToast(`Saved "${newItem.title.slice(0, 32)}..." to your Dashboard!`);
+    const saved = saveReportItem(itemData);
+    setSavedItems((prev) => [saved, ...prev.filter((i) => i.id !== saved.id)]);
+    showToast(`Saved "${saved.title.slice(0, 32)}..." to your Dashboard!`);
   };
 
   const handleDeleteItem = (id: string) => {
+    deleteReportItem(id);
     setSavedItems((prev) => prev.filter((i) => i.id !== id));
-    showToast("Report deleted from workspace.");
+    showToast("Report removed from your workspace.");
   };
 
   const showToast = (msg: string) => {
@@ -112,17 +105,17 @@ export default function App() {
           )}
         </main>
 
-        {/* Mobile Bottom Navigation Bar */}
+        {/* Global Toast Notification */}
+        {toastMessage && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900/90 border border-cyan-500/50 text-white text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce">
+            <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {/* Bottom Fixed Navigation Bar (Mobile Native Touch Experience) */}
         <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-slate-900/95 border border-cyan-500/60 text-cyan-300 text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce">
-          <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
     </div>
   );
 }

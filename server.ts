@@ -1,17 +1,61 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import { performRealSeoAudit } from "./src/server/seoCrawler";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
-// Initialize Gemini Client safely with User-Agent header
+// In-Memory IP Rate Limiter (60 requests per minute window)
+const ipRequestCounts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 60;
+
+function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Exclude health check and static assets
+  if (req.path === "/api/health" || req.path.startsWith("/assets")) {
+    return next();
+  }
+
+  const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown-ip";
+  const now = Date.now();
+  const clientRecord = ipRequestCounts.get(clientIp);
+
+  if (!clientRecord || now > clientRecord.resetAt) {
+    ipRequestCounts.set(clientIp, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return next();
+  }
+
+  if (clientRecord.count >= MAX_REQUESTS_PER_WINDOW) {
+    res.status(429).json({
+      error: "Rate limit reached (60 requests/min). Please slow down and try again shortly.",
+    });
+    return;
+  }
+
+  clientRecord.count++;
+  next();
+}
+
+app.use(rateLimitMiddleware);
+
+// Periodic cleanup of rate limiter map
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of ipRequestCounts.entries()) {
+    if (now > record.resetAt) {
+      ipRequestCounts.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Initialize Gemini Client safely
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -27,54 +71,89 @@ const getGeminiClient = () => {
   });
 };
 
-// Candidate models with fast lite first to prevent 503 high-demand spike errors
+// Candidate models with fast lite first
 const CANDIDATE_MODELS = [
   "gemini-3.1-flash-lite",
   "gemini-3.8-flash",
   "gemini-flash-latest",
 ];
 
+async function generateWithGemini(
+  prompt: string,
+  options?: { jsonMode?: boolean }
+): Promise<string> {
+  const ai = getGeminiClient();
+  if (!ai) {
+    throw new Error(
+      "GEMINI_API_KEY is not configured on the server. Please define GEMINI_API_KEY in your server environment variables."
+    );
+  }
+
+  let lastError: Error | null = null;
+
+  for (const model of CANDIDATE_MODELS) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        ...(options?.jsonMode ? { config: { responseMimeType: "application/json" } } : {}),
+      });
+
+      if (response && response.text) {
+        return response.text;
+      }
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      continue;
+    }
+  }
+
+  throw new Error(
+    `AI generation failed across available models: ${lastError?.message || "Service temporarily unavailable. Please try again."}`
+  );
+}
+
 const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://md-soyeb.vercel.app/</loc>
-    <lastmod>2026-09-21</lastmod>
+    <lastmod>2026-09-23</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://md-soyeb.vercel.app/export</loc>
-    <lastmod>2026-09-21</lastmod>
+    <lastmod>2026-09-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://md-soyeb.vercel.app/seo</loc>
-    <lastmod>2026-09-21</lastmod>
+    <lastmod>2026-09-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://md-soyeb.vercel.app/social</loc>
-    <lastmod>2026-09-21</lastmod>
+    <lastmod>2026-09-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://md-soyeb.vercel.app/business</loc>
-    <lastmod>2026-09-21</lastmod>
+    <lastmod>2026-09-23</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://md-soyeb.vercel.app/pricing</loc>
-    <lastmod>2026-09-21</lastmod>
+    <lastmod>2026-09-23</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://md-soyeb.vercel.app/dashboard</loc>
-    <lastmod>2026-09-21</lastmod>
+    <lastmod>2026-09-23</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -89,7 +168,7 @@ Allow: /
 Sitemap: https://md-soyeb.vercel.app/sitemap.xml
 `;
 
-// Direct SEO sitemap and robots endpoints (returns HTTP 200 with appropriate mime type)
+// Direct SEO sitemap and robots endpoints
 app.get("/sitemap.xml", (_req, res) => {
   res.header("Content-Type", "application/xml; charset=utf-8");
   res.status(200).send(SITEMAP_XML);
@@ -100,33 +179,6 @@ app.get("/robots.txt", (_req, res) => {
   res.status(200).send(ROBOTS_TXT);
 });
 
-async function generateWithGemini(
-  prompt: string,
-  options?: { jsonMode?: boolean }
-): Promise<string | null> {
-  const ai = getGeminiClient();
-  if (!ai) return null;
-
-  for (const model of CANDIDATE_MODELS) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        ...(options?.jsonMode ? { config: { responseMimeType: "application/json" } } : {}),
-      });
-
-      if (response && response.text) {
-        return response.text;
-      }
-    } catch {
-      // If a model is experiencing high demand (e.g. 503) or rate limits, smoothly try the next model
-      continue;
-    }
-  }
-
-  return null;
-}
-
 // Health check endpoint
 app.get("/api/health", (_req, res) => {
   res.json({
@@ -136,367 +188,277 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-// Central AI Business Assistant
+// 1. Central AI Business Assistant
 app.post("/api/ai/assistant", async (req, res) => {
   try {
     const { query } = req.body;
-    if (!query || typeof query !== "string") {
-      res.status(400).json({ error: "Query is required" });
+    if (!query || typeof query !== "string" || !query.trim()) {
+      res.status(400).json({ error: "Query is required and must not be empty." });
+      return;
+    }
+
+    if (query.length > 2000) {
+      res.status(400).json({ error: "Query exceeds maximum length of 2,000 characters." });
       return;
     }
 
     const prompt = `You are a world-class senior international trade advisor and business strategist for the "Business Growth & Export Hub".
-User inquiry: "${query}"
+User inquiry: "${query.trim()}"
 
 Provide a structured, deeply practical response formatted strictly with the following clear markdown sections:
 ### 1. 🎯 Possible Target Markets & Demand Analysis
-(Highlight 2-4 prime countries or market segments with logical reasons why)
+* Identify 2 to 3 highest potential destination countries.
+* Explain the specific consumer or industrial demand driver.
 
-### 2. 🤝 Buyer-Search Strategy & Outreach Channels
-(Concrete steps on finding verified buyers, B2B trade portals, import-export directories, chambers of commerce, and trade fairs)
+### 2. 🤝 Finding Verified Buyers Strategy
+* Realistic B2B sourcing methods: trade portals (e.g. Kompass, Europages), verified B2B chambers, export promotion councils, and specialized trade expos.
+* Note: Clearly disclaim that live buyer names or contact lists require verified registry validation and cannot be fabricated.
 
-### 3. 📦 Product Presentation & Packaging Suggestions
-(Packaging, branding, labeling standards, HS-Code considerations, certifications like CE, FDA, ISO, organic etc.)
+### 3. 📦 Product Packaging, Standards & HS-Codes
+* International packaging requirements (e.g. 5-ply corrugated, moisture control, pallet standards).
+* Expected Harmonized System (HS) code classification principles.
 
-### 4. 📋 Step-by-Step Export/Execution Roadmap
-(Actionable sequential steps from domestic setup to shipment & payment clearance)
+### 4. 🗺️ Step-by-Step Strategic Action Roadmap
+* A sequential roadmap:
+  - Step 1: Legal setup & Export licensing.
+  - Step 2: Quality compliance and lab testing.
+  - Step 3: Proforma invoice & Incoterms agreement (FOB/CIF).
+  - Step 4: Freight logistics, marine insurance, and customs clearance.
 
-### 5. ❓ Key Questions You Need to Answer First
-(3-4 critical clarifying questions about their capacity, funding, certifications, or supply chain)
+### 5. ❓ Key Questions to Clarify Before Proceeding
+* Ask 3 questions regarding current supply capacity, MOQ, and target margin.
 
-### 6. ⚠️ Risks & Compliance Considerations
-(Currency fluctuations, payment terms like LC/Escrow, shelf-life, shipping logistics, and tariffs)
-
-### ⚖️ Regulatory & Legal Advisory Notice
-*General guidance disclaimer: All international trade, tariff, tax, customs, and legal information provided is for educational and strategic guidance. Users must verify current requirements and regulatory filings with national export promotion councils, customs authorities, or certified legal/tax trade professionals.*`;
+### 6. ⚖️ Regulatory & Legal Advisory Notice
+* Include notice that trade, tariff, and customs advice is educational and strategic. Exporters must verify current filings with national customs authorities or certified customs house agents.`;
 
     const aiContent = await generateWithGemini(prompt);
-    if (aiContent) {
-      res.json({ content: aiContent, source: "gemini-ai" });
-      return;
-    }
-
-    // High quality intelligent fallback if Gemini key is not configured or all models busy
-    const fallbackResponse = `### 1. 🎯 Possible Target Markets & Demand Analysis
-* **United States & Canada:** Huge demand for artisan craftsmanship, sustainable goods, and niche consumer products. High purchasing power with willingness to pay premium margins for authentic handmade provenance.
-* **European Union (Germany, France, Netherlands):** Strong interest in eco-friendly packaging, ethical sourcing, and Fair Trade certified products.
-* **United Arab Emirates & GCC:** Booming retail, hospitality decor, and giftware sector with simplified import duties and favorable re-export logistics.
-
-### 2. 🤝 Buyer-Search Strategy & Outreach Channels
-* **Trade Portals & Directories:** Register on verified B2B platforms such as TradeKey, Alibaba (Gold Supplier), IndiaMART, and Kompass.
-* **Export Promotion Councils:** Connect with national export development authorities (e.g., EPCH, FIEO, or relevant chamber of commerce) to access vetted buyer directories and subsidized trade show booths.
-* **Direct B2B Outreach:** Identify boutique distributors, department store sourcing agents, and ethnic retail chains via LinkedIn and import manifest trade data databases (e.g. ImportYeti, Panjiva).
-
-### 3. 📦 Product Presentation & Packaging Suggestions
-* **Export-Grade Packaging:** Use moisture-proof, drop-tested corrugated cartons (5-ply minimum) with barcodes, fragile markers, and custom branded hang-tags.
-* **Storytelling & Provenance:** Highlight artisan craftsmanship, non-toxic materials, and cultural heritage in high-resolution digital PDF catalogs with FOB pricing.
-* **HS Classification:** Identify your exact 6-to-8 digit HS Code (Harmonized System) to determine tariffs and port duties.
-
-### 4. 📋 Step-by-Step Export/Execution Roadmap
-1. **Business Setup:** Secure your Business Registration, Tax ID (GST/VAT), and official Import-Export Code (IEC/EORI).
-2. **Quality Samples:** Prepare verified sample batches ready for international air courier with certificate of origin.
-3. **Quotation & Commercials:** Issue Proforma Invoices using standard Incoterms (FOB or CIF) and secure payment terms (Letter of Credit 'LC' at sight or 30-50% advance TT).
-4. **Logistics & Customs:** Partner with an authorized Custom House Agent (CHA) / Freight Forwarder for bill of lading and export clearance.
-
-### 5. ❓ Key Questions You Need to Answer First
-* What is your monthly consistent production capacity without compromising quality?
-* Do you have the working capital required to fulfill a 60-90 day shipping and payment cycle?
-* Have you tested compliance with target country regulations (e.g., California Prop 65, EU REACH)?
-
-### 6. ⚠️ Risks & Compliance Considerations
-* **Payment Default:** Never ship high-value orders on open account credit to first-time buyers; mandate confirmed Irrevocable LC or advance telegraphic transfer.
-* **Transit Damage:** Insure every ocean/air shipment under Institute Cargo Clauses (ICC-A).
-* **Exchange Rate Shifts:** Utilize forward contracts or multi-currency accounts to hedge against foreign currency fluctuations.
-
-### ⚖️ Regulatory & Legal Advisory Notice
-*General guidance disclaimer: All international trade, tariff, tax, customs, and legal information provided is for educational and strategic guidance. Users must verify current requirements and regulatory filings with national export promotion councils, customs authorities, or certified legal/tax trade professionals.*`;
-
-    res.json({ content: fallbackResponse, source: "curated-trade-engine" });
+    res.json({ content: aiContent, source: "gemini-ai" });
   } catch (err: unknown) {
-    console.error("AI Assistant error:", err);
-    res.status(500).json({
-      error: "Unable to process query at this time. Please try again.",
-    });
+    const message = err instanceof Error ? err.message : "AI Trade Advisor failed to process inquiry.";
+    console.error("Assistant API error:", message);
+    res.status(503).json({ error: message });
   }
 });
 
-// Dedicated Export Opportunity & Research
-app.post("/api/ai/export", async (req, res) => {
-  try {
-    const { productName, productCategory, targetCountry, budget, quantity, businessType, subTool } = req.body;
-
-    let prompt = "";
-    if (subTool === "buyer-message") {
-      prompt = `Draft a high-converting, professional B2B export buyer introduction message/email.
-Product: ${productName || "General Goods"}
-Category: ${productCategory || "Commercial"}
-Target Market: ${targetCountry || "Global"}
-Business Type: ${businessType || "Exporter"}
-Include: Professional subject line, FOB/CIF terms mention, USP highlight, invitation for catalog/sample dispatch, and clear call-to-action.`;
-    } else if (subTool === "product-description") {
-      prompt = `Create an export-grade B2B international product description and catalog specification sheet for:
-Product: ${productName || "Specialty Item"}
-Category: ${productCategory || "Manufactured Goods"}
-Include: Technical specifications, materials, packaging dimensions, minimum order quantity (MOQ), quality compliance notes, and HS Code recommendation notes.`;
-    } else if (subTool === "export-checklist") {
-      prompt = `Provide a comprehensive, sequential Export Readiness & Documentation Checklist for:
-Product: ${productName || "Export Goods"} to Target Country: ${targetCountry || "International"}.
-Include: Legal licenses, product lab testings, packaging/labeling, shipping documents (Commercial Invoice, Packing List, Certificate of Origin, Bill of Lading, Marine Insurance), and customs declaration steps.`;
-    } else {
-      prompt = `Analyze export opportunities for the following business parameters:
-Product Name: ${productName}
-Category: ${productCategory}
-Target Country: ${targetCountry}
-Budget: ${budget}
-Quantity: ${quantity}
-Business Type: ${businessType}
-
-Provide structured output with:
-1. Market Feasibility & Demand Index
-2. Potential Customer Types (e.g. Wholesalers, Retail Chains, E-commerce Sellers)
-3. Target Country Trade Insights (Tariff guidelines, consumer preferences)
-4. Recommended Incoterms & Payment Security
-5. Suggested Next Steps
-Clearly state that all trade opportunities are strategic AI-generated estimates and require local market verification.`;
-    }
-
-    const aiText = await generateWithGemini(prompt);
-    if (aiText) {
-      res.json({ content: aiText, source: "gemini-ai" });
-      return;
-    }
-
-    // Default curated response
-    res.json({
-      content: `### Export Market Intelligence for ${productName || "Your Product"} (${targetCountry || "Target Country"})
-* **Potential Customer Types:** Regional Importers, Specialized B2B Wholesalers, and Multi-brand Retail Distributors.
-* **Market Landscape:** Steady growth in demand for vetted quality suppliers in ${targetCountry || "the destination market"}. High emphasis on on-time delivery and compliant packaging.
-* **Recommended Terms:** FOB Port of Origin or CIF Destination Port with 30% advance TT and 70% against scanned Bill of Lading (or 100% Irrevocable LC at sight).
-* **Suggested Action:** Register sample catalog with HS Code specifications and apply for Certificate of Origin from local Chamber of Commerce.`,
-      source: "trade-analysis-system",
-    });
-  } catch (err) {
-    console.error("Export API error:", err);
-    res.status(500).json({ error: "Failed to generate export analysis" });
-  }
-});
-
-// SEO Analysis Endpoint
+// 2. Real SEO Audit Endpoint (Live Crawler + HTML Parser + Mathematical Score)
 app.post("/api/ai/seo", async (req, res) => {
   try {
     const { url, keyword } = req.body;
-    if (!url) {
-      res.status(400).json({ error: "Website URL is required" });
+    if (!url || typeof url !== "string" || !url.trim()) {
+      res.status(400).json({ error: "A valid website URL is required (e.g., https://example.com)." });
       return;
     }
 
-    const prompt = `Conduct a comprehensive SEO audit and strategy blueprint for the website: "${url}" with target niche/keyword: "${keyword || 'General'}".
-Format as JSON with keys:
+    if (url.length > 500) {
+      res.status(400).json({ error: "URL length exceeds 500 characters." });
+      return;
+    }
+
+    // Perform live webpage audit with SSRF protection
+    const auditResult = await performRealSeoAudit(url, keyword);
+
+    // If Gemini is available, enrich with tailored title/description improvements based on actual page content
+    if (getGeminiClient()) {
+      try {
+        const enrichmentPrompt = `You are a technical SEO expert. Here is real crawled data from the website "${auditResult.normalizedUrl}":
+Target keyword: "${keyword || 'General'}"
+Detected Page Title: "${auditResult.detectedData.title}" (${auditResult.detectedData.titleLength} chars)
+Detected Meta Description: "${auditResult.detectedData.metaDescription}" (${auditResult.detectedData.descriptionLength} chars)
+Detected H1: "${auditResult.detectedData.h1Samples.join(' | ')}"
+Detected H2s: "${auditResult.detectedData.h2Samples.join(' | ')}"
+Mathematical SEO Health Score: ${auditResult.score}/100
+
+Generate optimized meta title and meta description recommendations for this exact page. Return strictly JSON:
 {
-  "score": number between 65 and 94,
-  "summary": string,
-  "technicalSeo": { "mobile": string, "speed": string, "ssl": string, "crawlability": string },
-  "onPageSeo": { "headings": string, "contentQuality": string, "internalLinks": string },
-  "keywords": [ { "term": string, "volume": string, "difficulty": string, "intent": string } ],
-  "metaTitle": string,
-  "metaDescription": string,
-  "suggestions": [ { "priority": "Critical" | "High" | "Medium", "title": string, "action": string } ]
+  "improvedTitle": "string between 45 and 60 chars",
+  "improvedDescription": "string between 120 and 155 chars with call to action",
+  "additionalInsight": "string summarizing one high-impact technical or on-page win"
 }`;
 
-    const aiJson = await generateWithGemini(prompt, { jsonMode: true });
-    if (aiJson) {
-      try {
+        const aiJson = await generateWithGemini(enrichmentPrompt, { jsonMode: true });
         const parsed = JSON.parse(aiJson);
-        res.json({ ...parsed, source: "gemini-ai" });
-        return;
+
+        if (parsed.improvedTitle) auditResult.metaTitle = parsed.improvedTitle;
+        if (parsed.improvedDescription) auditResult.metaDescription = parsed.improvedDescription;
+        if (parsed.additionalInsight) {
+          auditResult.suggestions.unshift({
+            priority: "High",
+            title: "AI Semantic Recommendation",
+            action: parsed.additionalInsight,
+          });
+        }
       } catch {
-        // proceed to fallback
+        // Non-fatal enrichment fallback: raw crawl data stands pristine
       }
     }
 
-    // Curated high quality SEO audit fallback
-    const domain = url.replace(/https?:\/\//, "").replace(/\/.*$/, "");
-    res.json({
-      score: 79,
-      summary: `SEO analysis for ${domain} demonstrates strong foundational technical structure with significant untapped growth opportunities in long-tail keyword coverage and rich snippet meta tags.`,
-      technicalSeo: {
-        mobile: "Mobile-responsive layout detected. Core Web Vitals score estimated at 88/100.",
-        speed: "Time to First Byte (TTFB) ~0.6s. Needs modern WebP/AVIF image compression.",
-        ssl: "Valid HTTPS/TLS 1.3 certificate active.",
-        crawlability: "Robots.txt reachable; ensure XML sitemap is submitted in Google Search Console.",
-      },
-      onPageSeo: {
-        headings: "Single H1 tag recommended per landing page; maintain sequential H2 to H4 structure.",
-        contentQuality: "Add high-intent FAQs with Schema.org JSON-LD markup to capture zero-click SERP featured snippets.",
-        internalLinks: "Strengthen topic clusters by interlinking high-authority pages with commercial conversion pages.",
-      },
-      keywords: [
-        { term: `${keyword || domain} wholesale suppliers`, volume: "14.2K/mo", difficulty: "Medium (42)", intent: "Commercial" },
-        { term: `best ${keyword || 'b2b'} exporters worldwide`, volume: "8.6K/mo", difficulty: "Low (28)", intent: "Informational" },
-        { term: `how to buy ${keyword || 'products'} bulk discount`, volume: "5.1K/mo", difficulty: "Low (22)", intent: "Transactional" },
-        { term: `${keyword || 'business'} verified manufacturer directory`, volume: "3.4K/mo", difficulty: "Medium (48)", intent: "Commercial" },
-      ],
-      metaTitle: `${keyword ? keyword.toUpperCase() + ' - ' : ''}Premier B2B Suppliers & Export Catalog | ${domain}`,
-      metaDescription: `Discover verified global trade suppliers, high-yield export opportunities, and premium quality products. Request bulk catalogs and competitive FOB quotes today.`,
-      suggestions: [
-        { priority: "Critical", title: "Implement Structured Product/Organization Schema", action: "Add JSON-LD Schema to help search engine crawlers understand product pricing and availability." },
-        { priority: "High", title: "Target High-Intent Commercial Long-Tail Keywords", action: "Build dedicated comparison and buyer guide pages targeting commercial transactional search terms." },
-        { priority: "Medium", title: "Compress Media & Enable Edge CDN Caching", action: "Convert all product banner images to WebP to reduce Largest Contentful Paint (LCP) under 2.2s." },
-      ],
-      source: "seo-intelligence-engine",
-    });
-  } catch (err) {
-    console.error("SEO API error:", err);
-    res.status(500).json({ error: "Failed to generate SEO audit" });
+    res.json(auditResult);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "SEO audit failed.";
+    console.error("SEO Audit Error:", message);
+    const status = message.includes("SSRF") || message.includes("Invalid URL") || message.includes("empty") ? 400 : 502;
+    res.status(status).json({ error: message });
   }
 });
 
-// Social Media Generator Endpoint
+// 3. Social Media Content Generation Engine
 app.post("/api/ai/social", async (req, res) => {
   try {
     const { platform, business, audience, contentType } = req.body;
 
-    const prompt = `You are a social media marketing expert for small businesses and exporters.
-Platform: ${platform || 'Instagram'}
-Business / Product: ${business || 'Craft exports'}
-Target Audience: ${audience || 'Wholesalers & direct consumers'}
-Content Type: ${contentType || 'Educational & Promotional'}
+    if (!business || typeof business !== "string" || !business.trim()) {
+      res.status(400).json({ error: "Business or product description is required." });
+      return;
+    }
 
-Return a structured JSON with:
+    const prompt = `You are a world-class social media marketing strategist for small businesses, manufacturers, and exporters.
+Platform: ${platform || "Instagram"}
+Business / Product: ${business.trim()}
+Target Audience: ${audience ? audience.trim() : "B2B Wholesalers & Global Consumers"}
+Content Focus: ${contentType ? contentType.trim() : "High-converting Reels, Behind-the-Scenes & Educational"}
+
+Generate tailored, viral-ready social media content formatted strictly as JSON with this exact schema:
 {
-  "postIdeas": [ { "hook": string, "description": string, "format": string } ],
-  "reelIdeas": [ { "visual": string, "audioHook": string, "onScreenText": string } ],
-  "captions": [ { "headline": string, "body": string, "cta": string } ],
-  "hashtags": [string],
-  "videoHooks": [string],
+  "postIdeas": [
+    { "hook": string, "description": string, "format": string }
+  ],
+  "reelIdeas": [
+    { "visual": string, "audioHook": string, "onScreenText": string }
+  ],
+  "captions": [
+    { "headline": string, "body": string, "cta": string }
+  ],
+  "hashtags": string[],
+  "videoHooks": string[],
   "calendar": [
     { "day": string, "theme": string, "content": string, "bestTime": string }
   ]
-}`;
+}
+
+Ensure 3 postIdeas, 2 reelIdeas, 2 full captions, 10-14 niche hashtags, 3 video hooks, and a 7-day calendar (Monday to Sunday).`;
 
     const aiJson = await generateWithGemini(prompt, { jsonMode: true });
-    if (aiJson) {
-      try {
-        const parsed = JSON.parse(aiJson);
-        res.json({ ...parsed, source: "gemini-ai" });
-        return;
-      } catch {
-        // fallback
-      }
-    }
-
-    // Default social content calendar and ideas
-    res.json({
-      postIdeas: [
-        { hook: "Stop making this costly export mistake in 2026...", description: "Breakdown of the top 3 customs packaging blunders small businesses commit and how to resolve them.", format: "Carousel (5 Slides)" },
-        { hook: "Behind the Scenes: Packing an ocean freight container", description: "Authentic warehouse time-lapse highlighting 5-ply cartons, bubble wrap, and palletizing standards.", format: "Reel / Short Video" },
-        { hook: "Why our international buyers chose us over local distributors", description: "Client showcase focusing on strict QC inspection and custom private labeling.", format: "Single Photo + Longform Story" },
-      ],
-      reelIdeas: [
-        { visual: "Close-up macro shot of craftsmanship followed by swift export stamp seal", audioHook: "Trending energetic rhythm with punchy beat drop", onScreenText: "From raw workshop to global shipment in 48 hours" },
-        { visual: "Side-by-side comparison of standard fragile box vs. export drop-test container", audioHook: "Educational voiceover with sound effects", onScreenText: "How we ensure 0% transit damage overseas" },
-      ],
-      captions: [
-        {
-          headline: "Ever wondered how your order travels 7,000 miles without a scratch?",
-          body: `Quality control isn't just a buzzword for our team—it's an exact science.\n\nEvery single batch goes through:\n1️⃣ Multi-angle stress testing\n2️⃣ Moisture-shield vacuum packaging\n3️⃣ Barcode scan verification\n\nWhen your business scales internationally, your reputation rides in every single carton.`,
-          cta: "Drop a comment with 'CATALOG' or tap the link in bio to receive our latest wholesale pricing sheet.",
-        },
-        {
-          headline: "3 things international buyers look for before placing an order:",
-          body: `If you want to close higher-margin foreign deals:\n\n1. Transparent FOB/CIF terms\n2. Real-time factory progress updates\n3. Consistent batch-to-batch color & grade compliance\n\nSave this post for your next client pitch.`,
-          cta: "Share this with a fellow entrepreneur who is ready to take their brand global!",
-        },
-      ],
-      hashtags: [
-        "#SmallBusinessGrowth", "#ExportBusiness", "#MadeToLast", "#B2BMarketing",
-        "#GlobalTrade", "#ArtisanCrafts", "#WholesaleSuppliers", "#EntrepreneurMindset",
-        "#SocialMediaStrategy", "#BusinessTips", "#PackagingDesign", "#InternationalTrade"
-      ],
-      videoHooks: [
-        "If you run a small business, you need to hear this right now...",
-        "Here is the exact packaging hack that saved our brand $12,000 in transit claims...",
-        "3 secret trade portals top exporters use that no one talks about...",
-      ],
-      calendar: [
-        { day: "Monday", theme: "Motivation & Behind-The-Scenes", content: "Workshop tour & weekly production kickoff", bestTime: "9:00 AM" },
-        { day: "Tuesday", theme: "Educational Quick Tip", content: "Understanding HS Codes & customs duties simply", bestTime: "1:30 PM" },
-        { day: "Wednesday", theme: "Product Showcase & Quality Test", content: "Macro demonstration of durable materials & finishes", bestTime: "6:00 PM" },
-        { day: "Thursday", theme: "Buyer FAQ & Case Study", content: "How we solved an international delivery deadline", bestTime: "11:00 AM" },
-        { day: "Friday", theme: "Reel Trend & Team Culture", content: "Fast-paced packing montage with trending audio", bestTime: "7:00 PM" },
-        { day: "Saturday", theme: "Community Spotlight & Reviews", content: "Customer review screenshot + authentic testimonial", bestTime: "10:30 AM" },
-        { day: "Sunday", theme: "Weekly Recap & Catalog CTA", content: "Carousel of top products ready for immediate dispatch", bestTime: "4:00 PM" },
-      ],
-      source: "social-strategy-engine",
-    });
-  } catch (err) {
-    console.error("Social API error:", err);
-    res.status(500).json({ error: "Failed to generate social media content" });
+    const parsed = JSON.parse(aiJson);
+    res.json({ ...parsed, source: "gemini-ai" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Social media generation failed.";
+    console.error("Social API error:", message);
+    res.status(503).json({ error: message });
   }
 });
 
-// Business Help Generator
+// 4. Export Intelligence Engine
+app.post("/api/ai/export", async (req, res) => {
+  try {
+    const { productName, productCategory, targetCountry, budget, quantity, businessType, subTool } = req.body;
+
+    if (!productName || typeof productName !== "string" || !productName.trim()) {
+      res.status(400).json({ error: "Product name is required for export analysis." });
+      return;
+    }
+
+    let prompt = "";
+    if (subTool === "buyer-message") {
+      prompt = `Draft a high-converting, professional B2B export buyer cold introduction email for:
+Product: ${productName.trim()}
+Category: ${productCategory || "Manufactured Goods"}
+Target Country / Market: ${targetCountry || "International"}
+Supply Capacity: ${quantity || "Standard Commercial Volumes"}
+Business Type: ${businessType || "Manufacturer / Exporter"}
+
+Include:
+- Compelling, professional B2B Subject Line
+- Company credibility & international quality standards
+- Clear USP (Unique Selling Proposition)
+- FOB/CIF pricing framework mention and payment security terms (e.g. LC at sight or Advance TT)
+- Invitation for digital product catalog / sample dispatch
+- Explicit notice: Disclaim that buyer outreach must be conducted to verified corporate entities and respect international anti-spam laws (CAN-SPAM / GDPR).`;
+    } else if (subTool === "product-description") {
+      prompt = `Create an export-grade B2B international product specification catalog sheet for:
+Product: ${productName.trim()}
+Category: ${productCategory || "Manufactured Goods"}
+Supply Volume: ${quantity || "Monthly batches"}
+
+Include:
+- Commercial Product Overview & Provenance
+- Detailed Technical Specifications (Materials, Dimensions, Weight, Tolerances)
+- Recommended International HS Code (Harmonized System) category
+- Seaworthy Export Packaging Specs (Master Carton, Moisture Barrier, Palletization)
+- Minimum Order Quantity (MOQ) and Sample Lead Times
+- Regulatory Compliance Certifications required for entry into ${targetCountry || "global markets"}.`;
+    } else if (subTool === "checklist") {
+      prompt = `Create a step-by-step export compliance and logistics operational checklist for:
+Product: ${productName.trim()}
+Destination Country: ${targetCountry || "Global"}
+Business Type: ${businessType || "Exporter"}
+
+Format as structured markdown with clear stages:
+1. Legal Licensing & Tax Formalities (e.g. IEC / EORI / VAT)
+2. Lab Testing & Destination Regulatory Compliance
+3. Mandatory Export Shipping Documents (Commercial Invoice, Packing List, Certificate of Origin, Bill of Lading / Airway Bill, Marine Cargo Insurance)
+4. Customs Clearance at Origin & Destination Port.`;
+    } else if (subTool === "country-research") {
+      prompt = `Conduct deep export market intelligence for:
+Product: ${productName.trim()}
+Target Destination: ${targetCountry || "United States"}
+Budget: ${budget || "Standard"}
+
+Provide:
+1. Import Demand & Consumer Purchasing Trends in ${targetCountry || "target market"}
+2. Estimated Tariff & Customs Duties framework
+3. Domestic vs Foreign Competitive Landscape
+4. Distribution Channels (Direct-to-Retailer, Wholesalers, Distributors, Amazon FBA / B2B)
+5. Crucial Disclaimers: Note that tariffs and import duties change frequently and require confirmation with national customs authorities.`;
+    } else {
+      prompt = `Analyze export opportunities and build a strategic market entry blueprint for:
+Product Name: ${productName.trim()}
+Category: ${productCategory || "Goods"}
+Target Country: ${targetCountry || "Global"}
+Budget: ${budget || "Unspecified"}
+Production Quantity: ${quantity || "Standard capacity"}
+Business Type: ${businessType || "Exporter"}
+
+Provide:
+1. Feasibility Assessment & Potential Customer Types (Wholesalers, Boutique Retailers, E-commerce Sellers)
+2. Target Market Demand & Price Tolerance
+3. Packaging, HS-Code & International Quality Compliance
+4. Recommended Incoterms (FOB vs CIF) & Payment Security
+5. Realistic Step-by-Step Next Steps
+Clearly state that all trade opportunities are strategic AI-generated frameworks and require local market verification. Never claim guaranteed sales or fabricated buyer contacts.`;
+    }
+
+    const aiText = await generateWithGemini(prompt);
+    res.json({ content: aiText, source: "gemini-ai" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Export intelligence engine call failed.";
+    console.error("Export API error:", message);
+    res.status(503).json({ error: message });
+  }
+});
+
+// 5. Business Planning & Growth Suite Endpoint
 app.post("/api/ai/business", async (req, res) => {
   try {
     const { toolType, inputData } = req.body;
 
-    const prompt = `You are a startup advisor and commercial growth strategist for small enterprises.
-Tool requested: ${toolType}
-User input details: ${JSON.stringify(inputData)}
-
-Generate an exceptional, comprehensive, actionable response tailored for this tool. Use clear headings, bullet points, and practical metrics. Avoid vague generalities.`;
-
-    const aiText = await generateWithGemini(prompt);
-    if (aiText) {
-      res.json({ content: aiText, source: "gemini-ai" });
+    if (!toolType || typeof toolType !== "string") {
+      res.status(400).json({ error: "toolType is required." });
       return;
     }
 
-    // Default business generator outputs based on toolType
-    let fallback = "";
-    if (toolType === "pricing-calc") {
-      const cost = Number(inputData?.cost) || 25;
-      const margin = Number(inputData?.margin) || 40;
-      const markup = Number(inputData?.markup) || 66.7;
-      const retailPrice = (cost / (1 - margin / 100)).toFixed(2);
-      const wholesalePrice = (cost * 1.3).toFixed(2);
-      fallback = `### 💰 Commercial Pricing Analysis
-* **Direct Unit Cost (COGS):** $${cost.toFixed(2)}
-* **Target Gross Margin:** ${margin}%
-* **Recommended Retail Price (B2C):** **$${retailPrice}** (Gross Profit: $${(Number(retailPrice) - cost).toFixed(2)} per unit)
-* **Recommended Wholesale Price (B2B):** **$${wholesalePrice}** (30% net margin for bulk buyers with MOQ ≥ 100 units)
-* **Distributor FOB Export Price:** **$${(cost * 1.2).toFixed(2)}** (for container load orders with zero domestic logistics cost)
+    const prompt = `You are a senior commercial strategist and business growth advisor.
+Tool Requested: ${toolType}
+Input Data: ${JSON.stringify(inputData || {})}
 
-#### Strategic Recommendation:
-1. Bundle accessories or high-margin add-ons to increase Average Order Value (AOV).
-2. Offer tiered volume price breaks (e.g. 50-99 units: $${(Number(wholesalePrice) * 0.95).toFixed(2)}, 100-499 units: $${wholesalePrice}, 500+ units: $${(Number(wholesalePrice) * 0.88).toFixed(2)}).`;
-    } else if (toolType === "brand-names") {
-      fallback = `### 🏷️ Curated Brand Names for "${inputData?.niche || 'Your Business'}"
-1. **AuraCraft Global** — *Modern, premium, evocative of refined aesthetic value.*
-2. **Vanguard TradeWorks** — *Strong B2B appeal, dependable, institutional presence.*
-3. **Novara Exports** — *Sleek European cadence, easy to pronounce across continents.*
-4. **TerraOrigin Co.** — *Earth-friendly, organic, roots-inspired sustainable branding.*
-5. **Zenith Harbor** — *Evoking maritime trade, scale, and top-tier reliability.*
+Provide a structured, highly actionable business deliverable in clear markdown format.
+Be rigorous, realistic, and commercially sound. Do not invent fake statistics or guaranteed financial outcomes.`;
 
-#### Domain & Trademark Checklist:
-* Check .com availability and local national registry (.co.uk, .in, .de, .ca).
-* Verify non-infringement on USPTO and WIPO Global Brand Database.`;
-    } else {
-      fallback = `### 📋 Comprehensive Business Strategy for "${inputData?.title || inputData?.niche || 'Your Venture'}"
-* **Executive Value Proposition:** High-quality, dependable supply chain bridging domestic craft/manufacturing with global consumer demand.
-* **Target Demographics:** Discerning B2B retailers, boutique storefronts, and direct consumers seeking authentic craftsmanship.
-* **Core Revenue Streams:**
-  1. Direct-to-Consumer (D2C) online store with healthy 55%+ gross margins.
-  2. Wholesale distribution to verified retailers on 30-day net terms.
-  3. Custom OEM / Private-label contracts for corporate clients.
-* **Marketing & Acquisition Strategy:** Targeted search ads, content-driven social media reels showing quality testing, and attendance at regional trade expositions.
-* **Immediate 30-Day Milestone:** Finalize product catalog with HS Codes, launch sample kits, and initiate outreach to 50 vetted prospective buyers.`;
-    }
-
-    res.json({ content: fallback, source: "business-advisory-engine" });
-  } catch (err) {
-    console.error("Business API error:", err);
-    res.status(500).json({ error: "Failed to generate business report" });
+    const aiText = await generateWithGemini(prompt);
+    res.json({ content: aiText, source: "gemini-ai" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Business growth engine call failed.";
+    console.error("Business API error:", message);
+    res.status(503).json({ error: message });
   }
 });
 
@@ -521,4 +483,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Start server if not running in a serverless environment
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
+  startServer();
+}
+
+export { app };

@@ -13,7 +13,9 @@ import {
   Hash, 
   Flame, 
   Loader2,
-  Check
+  Check,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { SavedItem, SocialMediaResult } from "../types";
 
@@ -28,6 +30,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
   const [contentType, setContentType] = useState("Reel / Short Video & Behind-The-Scenes");
 
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [socialData, setSocialData] = useState<SocialMediaResult | null>(null);
   const [copiedCaptionIndex, setCopiedCaptionIndex] = useState<number | null>(null);
   const [copiedHashtags, setCopiedHashtags] = useState(false);
@@ -36,6 +39,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
   const handleGenerateSocial = async () => {
     if (!business.trim() || isLoading) return;
     setIsLoading(true);
+    setErrorMessage(null);
     setHasSaved(false);
 
     try {
@@ -45,54 +49,17 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
         body: JSON.stringify({ platform, business, audience, contentType }),
       });
 
-      if (!res.ok) throw new Error("Failed to generate social media content");
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Server responded with status ${res.status}`);
+      }
+
       setSocialData(data);
-    } catch (err) {
-      console.error(err);
-      // Fallback
-      setSocialData({
-        postIdeas: [
-          { hook: "Stop shipping delicate crafts until you test this 3-second packaging trick...", description: "Showcase of our multi-layered honeycomb paper wrap that eliminates all plastic bubble wrap while passing 1-meter drop tests.", format: "Reel / Short (30s)" },
-          { hook: "3 reasons why US boutique retailers are buying directly from artisan manufacturers:", description: "Carousel showing wholesale pricing transparency, custom branding capability, and rapid sea-freight timelines.", format: "Carousel (5 Slides)" },
-          { hook: "A day in our export workshop: Packing 1,200 handmade mugs for California", description: "Satisfying acoustic sounds of kiln opening, QC stamping, and master carton sealing.", format: "ASMR Time-Lapse Video" },
-        ],
-        reelIdeas: [
-          { visual: "Side-by-side drop test of traditional fragile carton vs. our export container", audioHook: "Punchy cinematic beat drop on impact", onScreenText: "0% transit damage or full refund guarantee" },
-          { visual: "High-speed pottery wheel spinning into a finished artisanal vase with custom buyer logo stamp", audioHook: "Upbeat motivational lo-fi rhythm", onScreenText: "Private label manufacturing made effortless" },
-        ],
-        captions: [
-          {
-            headline: "When you export internationally, your reputation travels inside every single box. 📦✈️",
-            body: `Here’s how our workshop ensures every shipment arrives flawless:\n\n1️⃣ Individual moisture-barrier foil wraps\n2️⃣ Certified drop-tested 5-ply corrugated walls\n3️⃣ High-contrast international glass-handling stickers\n\nDirect from our studio to your showroom shelves.`,
-            cta: "Send us a DM with 'CATALOG' or tap the link in our bio for wholesale rates & sample boxes.",
-          },
-          {
-            headline: "Behind the clay: Meet the master artisans shaping your morning coffee mugs. ☕✨",
-            body: `Each piece takes 14 days of dedicated handcrafting, two kiln firings, and strict food-grade glaze testing.\n\nSupporting authentic craft while keeping wholesale MOQ accessible is why 40+ international boutiques partner with us every season.`,
-            cta: "Save this post and share with someone who values sustainable handmade design.",
-          },
-        ],
-        hashtags: [
-          "#ArtisanCeramics", "#ExportQuality", "#HandmadeHomeDecor", "#B2BWholesale",
-          "#PotteryLovers", "#DirectFromMaker", "#SustainableLiving", "#BoutiqueBuyer",
-          "#GlobalTrade", "#InteriorDesignInspo", "#MadeWithCare", "#SmallBusinessGrowth"
-        ],
-        videoHooks: [
-          "If you sell home decor, this one supplier hack will double your margins...",
-          "Watch what happens when we drop this ceramic box from 5 feet...",
-          "Here is what 1,200 custom pieces look like right before loading into an ocean container...",
-        ],
-        calendar: [
-          { day: "Monday", theme: "Behind-The-Scenes Workshop Kickoff", content: "Master artisan throwing raw clay on the wheel with acoustic sounds.", bestTime: "9:00 AM" },
-          { day: "Tuesday", theme: "Quality Test / Packaging Hack", content: "Drop-test demonstration highlighting durable transit packaging.", bestTime: "1:00 PM" },
-          { day: "Wednesday", theme: "Educational Trade Tip", content: "Explaining FOB vs CIF terms simply for boutique retailers.", bestTime: "5:30 PM" },
-          { day: "Thursday", theme: "Product Feature & Glaze Macro", content: "Close-up macro shots showing organic glaze textures in natural sunlight.", bestTime: "11:00 AM" },
-          { day: "Friday", theme: "Trending Reel / Time-lapse", content: "Loading palletized boxes into the delivery truck with upbeat audio.", bestTime: "6:30 PM" },
-          { day: "Saturday", theme: "Customer Unboxing / Retailer Spotlight", content: "Video clip of an international retailer displaying the collection.", bestTime: "10:00 AM" },
-          { day: "Sunday", theme: "Weekly Recap & Wholesale CTA", content: "Carousel of top 5 bestsellers with catalog download link in bio.", bestTime: "4:00 PM" },
-        ],
-      });
+    } catch (err: unknown) {
+      console.error("Social generation error:", err);
+      const msg = err instanceof Error ? err.message : "Failed to generate social media strategy.";
+      setErrorMessage(msg);
+      setSocialData(null); // Never replace failed real requests with fake data
     } finally {
       setIsLoading(false);
     }
@@ -228,6 +195,26 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
           )}
         </button>
       </div>
+
+      {/* Error Alert Banner */}
+      {errorMessage && (
+        <div className="p-4 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-rose-200 backdrop-blur-xl space-y-2">
+          <div className="flex items-center gap-2 font-bold text-sm text-rose-300">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>Generation Could Not Be Completed</span>
+          </div>
+          <p className="text-xs text-rose-200/90 leading-relaxed">
+            {errorMessage}
+          </p>
+          <button
+            onClick={handleGenerateSocial}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-white text-xs font-semibold border border-rose-700 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Generation</span>
+          </button>
+        </div>
+      )}
 
       {/* Generated Content Results */}
       {socialData && (

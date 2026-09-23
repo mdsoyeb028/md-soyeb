@@ -2,28 +2,59 @@ export type ActiveTab = "home" | "seo" | "social" | "export" | "business" | "das
 
 export interface SavedItem {
   id: string;
+  userId?: string;
   type: "ai-assistant" | "seo" | "social" | "export" | "business";
   title: string;
   summary: string;
   content: string | Record<string, unknown>;
   createdAt: string;
+  updatedAt?: string;
   category?: string;
   tags?: string[];
 }
 
 export interface SeoAnalysisResult {
   score: number;
+  url?: string;
+  normalizedUrl?: string;
+  responseTimeMs?: number;
+  pageSizeKb?: number;
+  isHttps?: boolean;
+  httpStatus?: number;
   summary: string;
   technicalSeo: {
     mobile: string;
     speed: string;
     ssl: string;
     crawlability: string;
+    coreWebVitalsNotice?: string;
   };
   onPageSeo: {
     headings: string;
     contentQuality: string;
     internalLinks: string;
+  };
+  detectedData?: {
+    title: string;
+    titleLength: number;
+    metaDescription: string;
+    descriptionLength: number;
+    canonical: string | null;
+    hasViewport: boolean;
+    viewportContent: string | null;
+    h1Count: number;
+    h1Samples: string[];
+    h2Count: number;
+    h2Samples: string[];
+    h3Count: number;
+    totalImages: number;
+    imagesWithAlt: number;
+    imagesMissingAlt: number;
+    internalLinksCount: number;
+    externalLinksCount: number;
+    robotsTxtFound: boolean;
+    sitemapFound: boolean;
+    wordCount: number;
   };
   keywords: Array<{
     term: string;
@@ -31,6 +62,7 @@ export interface SeoAnalysisResult {
     difficulty: string;
     intent: string;
   }>;
+  keywordNotice?: string;
   metaTitle: string;
   metaDescription: string;
   suggestions: Array<{
