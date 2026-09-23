@@ -128,12 +128,22 @@ export interface SocialMediaResult {
 
 export interface ExportAnalysisResult {
   product: string;
-  country: string;
-  customerTypes: string[];
-  marketInfo: string;
-  incoterms: string;
-  suggestedSteps: string[];
-  rawText?: string;
+  category?: string;
+  originCountry?: string;
+  targetCountry: string;
+  customerTypes?: string[];
+  marketSuitability?: string;
+  incotermsGuidance?: string;
+  hsCodeGuidance?: string;
+  paymentGuidance?: string;
+  logisticsPackaging?: string;
+  requiredDocuments?: string[];
+  complianceChecklist?: string[];
+  verificationNotice?: string;
+  buyerOutreachDraft?: string;
+  quotationDraft?: string;
+  suggestedSteps?: string[];
+  content: string;
   source?: string;
 }
 

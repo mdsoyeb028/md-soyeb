@@ -452,90 +452,132 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
 
 // 4. Export Intelligence Engine
 app.post("/api/ai/export", async (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
   try {
-    const { productName, productCategory, targetCountry, budget, quantity, businessType, subTool } = req.body;
+    const {
+      productName,
+      productCategory,
+      originCountry,
+      targetCountry,
+      buyerType,
+      businessSize,
+      specificQuestion,
+      subTool,
+      budget,
+      quantity,
+      businessType,
+    } = req.body || {};
 
     if (!productName || typeof productName !== "string" || !productName.trim()) {
-      res.status(400).json({ error: "Product name is required for export analysis." });
+      res.status(400).json({ 
+        success: false, 
+        error: "Product name is required for export analysis." 
+      });
       return;
     }
 
-    let prompt = "";
-    if (subTool === "buyer-message") {
-      prompt = `Draft a high-converting, professional B2B export buyer cold introduction email for:
-Product: ${productName.trim()}
-Category: ${productCategory || "Manufactured Goods"}
-Target Country / Market: ${targetCountry || "International"}
-Supply Capacity: ${quantity || "Standard Commercial Volumes"}
-Business Type: ${businessType || "Manufacturer / Exporter"}
-
-Include:
-- Compelling, professional B2B Subject Line
-- Company credibility & international quality standards
-- Clear USP (Unique Selling Proposition)
-- FOB/CIF pricing framework mention and payment security terms (e.g. LC at sight or Advance TT)
-- Invitation for digital product catalog / sample dispatch
-- Explicit notice: Disclaim that buyer outreach must be conducted to verified corporate entities and respect international anti-spam laws (CAN-SPAM / GDPR).`;
-    } else if (subTool === "product-description") {
-      prompt = `Create an export-grade B2B international product specification catalog sheet for:
-Product: ${productName.trim()}
-Category: ${productCategory || "Manufactured Goods"}
-Supply Volume: ${quantity || "Monthly batches"}
-
-Include:
-- Commercial Product Overview & Provenance
-- Detailed Technical Specifications (Materials, Dimensions, Weight, Tolerances)
-- Recommended International HS Code (Harmonized System) category
-- Seaworthy Export Packaging Specs (Master Carton, Moisture Barrier, Palletization)
-- Minimum Order Quantity (MOQ) and Sample Lead Times
-- Regulatory Compliance Certifications required for entry into ${targetCountry || "global markets"}.`;
-    } else if (subTool === "checklist") {
-      prompt = `Create a step-by-step export compliance and logistics operational checklist for:
-Product: ${productName.trim()}
-Destination Country: ${targetCountry || "Global"}
-Business Type: ${businessType || "Exporter"}
-
-Format as structured markdown with clear stages:
-1. Legal Licensing & Tax Formalities (e.g. IEC / EORI / VAT)
-2. Lab Testing & Destination Regulatory Compliance
-3. Mandatory Export Shipping Documents (Commercial Invoice, Packing List, Certificate of Origin, Bill of Lading / Airway Bill, Marine Cargo Insurance)
-4. Customs Clearance at Origin & Destination Port.`;
-    } else if (subTool === "country-research") {
-      prompt = `Conduct deep export market intelligence for:
-Product: ${productName.trim()}
-Target Destination: ${targetCountry || "United States"}
-Budget: ${budget || "Standard"}
-
-Provide:
-1. Import Demand & Consumer Purchasing Trends in ${targetCountry || "target market"}
-2. Estimated Tariff & Customs Duties framework
-3. Domestic vs Foreign Competitive Landscape
-4. Distribution Channels (Direct-to-Retailer, Wholesalers, Distributors, Amazon FBA / B2B)
-5. Crucial Disclaimers: Note that tariffs and import duties change frequently and require confirmation with national customs authorities.`;
-    } else {
-      prompt = `Analyze export opportunities and build a strategic market entry blueprint for:
-Product Name: ${productName.trim()}
-Category: ${productCategory || "Goods"}
-Target Country: ${targetCountry || "Global"}
-Budget: ${budget || "Unspecified"}
-Production Quantity: ${quantity || "Standard capacity"}
-Business Type: ${businessType || "Exporter"}
-
-Provide:
-1. Feasibility Assessment & Potential Customer Types (Wholesalers, Boutique Retailers, E-commerce Sellers)
-2. Target Market Demand & Price Tolerance
-3. Packaging, HS-Code & International Quality Compliance
-4. Recommended Incoterms (FOB vs CIF) & Payment Security
-5. Realistic Step-by-Step Next Steps
-Clearly state that all trade opportunities are strategic AI-generated frameworks and require local market verification. Never claim guaranteed sales or fabricated buyer contacts.`;
+    if (productName.length > 300) {
+      res.status(400).json({ 
+        success: false, 
+        error: "Product name exceeds 300 characters limit." 
+      });
+      return;
     }
 
-    const aiText = await generateWithGemini(prompt);
-    res.json({ content: aiText, source: "gemini-ai" });
+    const selectedProduct = productName.trim();
+    const selectedCategory = productCategory && typeof productCategory === "string" && productCategory.trim() ? productCategory.trim() : "Commercial Goods & Manufactured Products";
+    const selectedOrigin = originCountry && typeof originCountry === "string" && originCountry.trim() ? originCountry.trim() : "Origin Country";
+    const selectedTarget = targetCountry && typeof targetCountry === "string" && targetCountry.trim() ? targetCountry.trim() : "International Market";
+    const selectedBuyerType = buyerType && typeof buyerType === "string" && buyerType.trim() ? buyerType.trim() : "B2B Wholesalers, Distributors & Importers";
+    const selectedSize = businessSize || businessType || "Small to Medium Exporter";
+    const selectedQuestion = specificQuestion && typeof specificQuestion === "string" && specificQuestion.trim() ? specificQuestion.trim() : "";
+    const selectedSubTool = subTool && typeof subTool === "string" ? subTool.trim() : "opportunities";
+
+    const prompt = `You are an elite international trade consultant, customs logistics strategist, and B2B export advisor.
+
+TRADE PARAMETERS:
+- Product Name: "${selectedProduct}"
+- Product Category: "${selectedCategory}"
+- Country of Origin: "${selectedOrigin}"
+- Target Destination Country: "${selectedTarget}"
+- Target Buyer/Customer Type: "${selectedBuyerType}"
+- Exporter Business Size / Type: "${selectedSize}"
+- Specific User Question / Inquiries: "${selectedQuestion || "Complete export feasibility, compliance, Incoterms, and buyer outreach strategy."}"
+- Sub-Tool Requested: "${selectedSubTool}"
+- Budget / Quantity Context: "${budget || "Commercial scale"} / ${quantity || "Standard export batches"}"
+
+CRITICAL ACCURACY & COMPLIANCE RULES:
+1. Do NOT invent or fabricate official regulations, import licenses, exact tariff duty percentages, mandatory HS codes, buyers, companies, phone numbers, email addresses, or market statistics.
+2. Do NOT promise guaranteed export profits, guaranteed sales, or verified buyer lists.
+3. When information depends on destination-country specific rules, customs classifications, or bi-lateral trade agreements, YOU MUST explicitly label it as: "Needs verification with the relevant official authority."
+4. Provide practical, high-value commercial guidance:
+   - Target-country market research & product suitability
+   - HS-code research guidance (explaining how the 6-digit Harmonized System works and how to find the specific national 8-10 digit tariff line)
+   - Incoterms explanation (e.g. FOB vs CIF vs DDP, where transfer of risk occurs)
+   - Payment method guidance (e.g. Irrevocable LC at Sight, Advance TT 30/70, Documentary Collections)
+   - Packaging, labeling & seaworthy logistics (drop testing, ISPM-15 wooden pallet heat treatment, barcode/country of origin labeling)
+   - Required international shipping documents checklist (Commercial Invoice, Packing List, Bill of Lading / Airway Bill, Certificate of Origin, Insurance)
+   - Risk and compliance checklist
+   - B2B buyer outreach message draft or quotation draft tailored to this trade relationship.
+
+Respond with strictly valid JSON according to this exact JSON schema:
+{
+  "product": "${selectedProduct}",
+  "category": "${selectedCategory}",
+  "originCountry": "${selectedOrigin}",
+  "targetCountry": "${selectedTarget}",
+  "verificationNotice": "Needs verification with the relevant official authority.",
+  "customerTypes": [
+    "string",
+    "string",
+    "string"
+  ],
+  "marketSuitability": "In-depth analysis of product fit, consumer/commercial demand in ${selectedTarget}, positioning, and competitive entry hurdles.",
+  "hsCodeGuidance": "Detailed Harmonized System classification advice, likely chapter range, and steps to determine the exact destination tariff code with the national customs office.",
+  "incotermsGuidance": "Clear explanation of standard Incoterms (e.g. FOB Port of Loading vs CIF Destination Port), insurance obligations, and risk allocation for this trade lane.",
+  "paymentGuidance": "Practical trade finance and secure payment mechanisms (e.g., Irrevocable Letter of Credit, confirmed LC, advance telegraphic transfer split).",
+  "logisticsPackaging": "Export-grade packaging specifications, moisture protection, palletization standards (ISPM-15), drop-testing, and shipping marks.",
+  "requiredDocuments": [
+    "Commercial Invoice with Incoterms and HS Code",
+    "Packing List itemizing net/gross weights and dimensions",
+    "Bill of Lading (Ocean) or Air Waybill (Air)",
+    "Certificate of Origin (Preferential / Non-Preferential)",
+    "Marine Cargo Insurance Certificate",
+    "Needs verification with the relevant official authority for specific destination permits"
+  ],
+  "complianceChecklist": [
+    "Obtain Import Export Code (IEC / EORI) from national trade body",
+    "Verify product quality, food safety, or technical standard certificates in ${selectedTarget} - Needs verification with the relevant official authority",
+    "Confirm destination customs tariff rate and applicable VAT/GST",
+    "Ensure packaging complies with international phytosanitary and environmental disposal regulations",
+    "Vet buyer legal registration and establish trade credit terms prior to shipping"
+  ],
+  "buyerOutreachDraft": "Professional, personalized B2B cold introduction letter/email for foreign buyers with clear subject line, value proposition, MOQ, and sample offer.",
+  "quotationDraft": "Formal B2B export price quotation framework including validity period, payment terms, Incoterms, lead time, and port specifications.",
+  "content": "Comprehensive, beautifully structured Markdown briefing incorporating all executive research, checklists, and actionable advice with clear headers, bullet points, and prominent 'Needs verification with the relevant official authority' notices."
+}`;
+
+    const aiJson = await generateWithGemini(prompt, { jsonMode: true });
+    const parsed = JSON.parse(aiJson);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...parsed,
+        source: "gemini-ai",
+      },
+      ...parsed,
+      content: parsed.content || "Export briefing generated successfully.",
+      source: "gemini-ai",
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Export intelligence engine call failed.";
     console.error("Export API error:", message);
-    res.status(503).json({ error: message });
+    const status = message.includes("required") || message.includes("exceeds") ? 400 : 503;
+    res.status(status).json({ 
+      success: false, 
+      error: message 
+    });
   }
 });
 
