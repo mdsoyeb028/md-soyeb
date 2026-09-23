@@ -1,9 +1,9 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import { performRealSeoAudit } from "./src/server/seoCrawler";
+import { generateAICompletion, AIProviderError } from "./src/server/aiProvider";
 
 dotenv.config();
 
@@ -12,14 +12,19 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "1mb" }));
 
-// In-Memory IP Rate Limiter (60 requests per minute window)
+// In-Memory IP Rate Limiter (30 requests per minute per IP to protect AI resources)
 const ipRequestCounts = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 60;
+const MAX_REQUESTS_PER_WINDOW = 30;
 
 function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
-  // Exclude health check and static assets
-  if (req.path === "/api/health" || req.path.startsWith("/assets")) {
+  // Exclude health check, static assets, sitemap and robots
+  if (
+    req.path === "/api/health" || 
+    req.path.startsWith("/assets") ||
+    req.path === "/sitemap.xml" ||
+    req.path === "/robots.txt"
+  ) {
     return next();
   }
 
@@ -33,8 +38,10 @@ function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): v
   }
 
   if (clientRecord.count >= MAX_REQUESTS_PER_WINDOW) {
-    res.status(429).json({
-      error: "Rate limit reached (60 requests/min). Please slow down and try again shortly.",
+    res.status(429).setHeader("Content-Type", "application/json; charset=utf-8").json({
+      success: false,
+      error: "Rate limit reached (30 requests/min). Please slow down and try again shortly.",
+      code: "RATE_LIMIT_EXCEEDED",
     });
     return;
   }
@@ -56,64 +63,6 @@ if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
     }
   }, 5 * 60 * 1000);
   timer.unref?.();
-}
-
-// Initialize Gemini Client safely
-const getGeminiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
-  });
-};
-
-// Candidate models with fast lite first
-const CANDIDATE_MODELS = [
-  "gemini-3.1-flash-lite",
-  "gemini-3.8-flash",
-  "gemini-flash-latest",
-];
-
-async function generateWithGemini(
-  prompt: string,
-  options?: { jsonMode?: boolean }
-): Promise<string> {
-  const ai = getGeminiClient();
-  if (!ai) {
-    throw new Error(
-      "GEMINI_API_KEY is not configured on the server. Please define GEMINI_API_KEY in your server environment variables."
-    );
-  }
-
-  let lastError: Error | null = null;
-
-  for (const model of CANDIDATE_MODELS) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        ...(options?.jsonMode ? { config: { responseMimeType: "application/json" } } : {}),
-      });
-
-      if (response && response.text) {
-        return response.text;
-      }
-    } catch (err: unknown) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      continue;
-    }
-  }
-
-  throw new Error(
-    `AI generation failed across available models: ${lastError?.message || "Service temporarily unavailable. Please try again."}`
-  );
 }
 
 const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -186,7 +135,8 @@ app.get("/robots.txt", (_req, res) => {
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    hasApiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasOpenRouterKey: Boolean(process.env.OPENROUTER_API_KEY),
     timestamp: new Date().toISOString(),
   });
 });
@@ -272,8 +222,8 @@ Respond ONLY with strictly valid JSON matching this exact structure:
   "verificationNotice": "Strategic advice and projections are educational estimates. Official regulations, tariffs, tax implications, and legal compliance require verification with the relevant official authority."
 }`;
 
-    const aiJson = await generateWithGemini(prompt, { jsonMode: true });
-    const parsed = JSON.parse(aiJson);
+    const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
+    const parsed = JSON.parse(text);
 
     const markdownContent = [
       `### Strategy & Direct Answer\n${parsed.answer || ""}`,
@@ -292,6 +242,8 @@ Respond ONLY with strictly valid JSON matching this exact structure:
       `\n\n> **Notice:** ${parsed.verificationNotice || "Needs verification with the relevant official authority or professional advisor."}`,
     ].join("");
 
+    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
+
     res.status(200).json({
       success: true,
       data: {
@@ -302,20 +254,26 @@ Respond ONLY with strictly valid JSON matching this exact structure:
         nextSteps: Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [],
         verificationNotice: parsed.verificationNotice || "Needs verification with the relevant official authority.",
         content: markdownContent,
-        source: "gemini-ai",
+        source: sourceName,
       },
+      provider,
       content: markdownContent,
-      source: "gemini-ai",
+      source: sourceName,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "AI Trade Advisor failed to process inquiry.";
-    console.error("Assistant API error:", message);
-    const status = message.includes("required") || message.includes("exceeds") ? 400 : 503;
-    res.status(status).json({ 
+    console.error("Assistant API error:", err);
+    if (err instanceof AIProviderError) {
+      res.status(err.statusCode).json({
+        success: false,
+        error: err.message,
+        code: err.code,
+      });
+      return;
+    }
+    res.status(503).json({ 
       success: false, 
-      error: message.includes("API key") 
-        ? "AI service is temporarily unavailable. Please verify API configuration." 
-        : message 
+      error: "AI service is temporarily unavailable. Please try again later.",
+      code: "AI_PROVIDER_UNAVAILABLE",
     });
   }
 });
@@ -341,13 +299,12 @@ app.post("/api/ai/seo", async (req, res) => {
       return;
     }
 
-    // Perform live webpage audit with SSRF protection
+    // Perform live webpage audit with SSRF protection (NEVER replaced by AI)
     const auditResult = await performRealSeoAudit(url, keyword);
+    let aiProvider: "gemini" | "openrouter" | "none" = "none";
 
-    // If Gemini is available, enrich with tailored title/description improvements based on actual page content
-    if (getGeminiClient()) {
-      try {
-        const enrichmentPrompt = `You are a technical SEO expert. Here is real crawled data from the website "${auditResult.normalizedUrl}":
+    // Enrich with tailored AI semantic recommendations using provider fallback
+    const enrichmentPrompt = `You are a technical SEO expert. Here is real crawled data from the website "${auditResult.normalizedUrl}":
 Target keyword: "${keyword || 'General'}"
 Detected Page Title: "${auditResult.detectedData.title}" (${auditResult.detectedData.titleLength} chars)
 Detected Meta Description: "${auditResult.detectedData.metaDescription}" (${auditResult.detectedData.descriptionLength} chars)
@@ -362,26 +319,30 @@ Generate optimized meta title and meta description recommendations for this exac
   "additionalInsight": "string summarizing one high-impact technical or on-page win"
 }`;
 
-        const aiJson = await generateWithGemini(enrichmentPrompt, { jsonMode: true });
-        const parsed = JSON.parse(aiJson);
+    try {
+      const { text, provider } = await generateAICompletion(enrichmentPrompt, { jsonMode: true, timeoutMs: 12000 });
+      aiProvider = provider;
+      const parsed = JSON.parse(text);
 
-        if (parsed.improvedTitle) auditResult.metaTitle = parsed.improvedTitle;
-        if (parsed.improvedDescription) auditResult.metaDescription = parsed.improvedDescription;
-        if (parsed.additionalInsight) {
-          auditResult.suggestions.unshift({
-            priority: "High",
-            title: "AI Semantic Recommendation",
-            action: parsed.additionalInsight,
-          });
-        }
-      } catch {
-        // Non-fatal enrichment fallback: raw crawl data stands pristine
+      if (parsed.improvedTitle) auditResult.metaTitle = parsed.improvedTitle;
+      if (parsed.improvedDescription) auditResult.metaDescription = parsed.improvedDescription;
+      if (parsed.additionalInsight) {
+        auditResult.suggestions.unshift({
+          priority: "High",
+          title: "AI Semantic Recommendation",
+          action: parsed.additionalInsight,
+        });
       }
+    } catch {
+      // Non-fatal enrichment fallback: raw crawl data remains pristine and complete
+      aiProvider = "none";
     }
 
     res.status(200).json({
       success: true,
+      data: auditResult,
       audit: auditResult,
+      provider: aiProvider,
       ...auditResult,
     });
   } catch (err: unknown) {
@@ -504,25 +465,34 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
   ]
 }`;
 
-    const aiJson = await generateWithGemini(prompt, { jsonMode: true });
-    const parsed = JSON.parse(aiJson);
+    const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
+    const parsed = JSON.parse(text);
+    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
 
     res.status(200).json({
       success: true,
       data: {
         ...parsed,
-        source: "gemini-ai",
+        source: sourceName,
       },
+      provider,
       ...parsed,
-      source: "gemini-ai",
+      source: sourceName,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Social media generation failed.";
-    console.error("Social API error:", message);
-    const status = message.includes("required") || message.includes("exceeds") ? 400 : 503;
-    res.status(status).json({ 
+    console.error("Social API error:", err);
+    if (err instanceof AIProviderError) {
+      res.status(err.statusCode).json({
+        success: false,
+        error: err.message,
+        code: err.code,
+      });
+      return;
+    }
+    res.status(503).json({ 
       success: false, 
-      error: message 
+      error: "AI service is temporarily unavailable. Please try again later.",
+      code: "AI_PROVIDER_UNAVAILABLE",
     });
   }
 });
@@ -589,11 +559,11 @@ CRITICAL ACCURACY & COMPLIANCE RULES:
 3. When information depends on destination-country specific rules, customs classifications, or bi-lateral trade agreements, YOU MUST explicitly label it as: "Needs verification with the relevant official authority."
 4. Provide practical, high-value commercial guidance:
    - Target-country market research & product suitability
-   - HS-code research guidance (explaining how the 6-digit Harmonized System works and how to find the specific national 8-10 digit tariff line)
-   - Incoterms explanation (e.g. FOB vs CIF vs DDP, where transfer of risk occurs)
-   - Payment method guidance (e.g. Irrevocable LC at Sight, Advance TT 30/70, Documentary Collections)
-   - Packaging, labeling & seaworthy logistics (drop testing, ISPM-15 wooden pallet heat treatment, barcode/country of origin labeling)
-   - Required international shipping documents checklist (Commercial Invoice, Packing List, Bill of Lading / Airway Bill, Certificate of Origin, Insurance)
+   - HS-code research guidance
+   - Incoterms explanation
+   - Payment method guidance
+   - Packaging, labeling & seaworthy logistics
+   - Required international shipping documents checklist
    - Risk and compliance checklist
    - B2B buyer outreach message draft or quotation draft tailored to this trade relationship.
 
@@ -634,37 +604,50 @@ Respond with strictly valid JSON according to this exact JSON schema:
   "content": "Comprehensive, beautifully structured Markdown briefing incorporating all executive research, checklists, and actionable advice with clear headers, bullet points, and prominent 'Needs verification with the relevant official authority' notices."
 }`;
 
-    const aiJson = await generateWithGemini(prompt, { jsonMode: true });
-    const parsed = JSON.parse(aiJson);
+    const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
+    const parsed = JSON.parse(text);
+    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
 
     res.status(200).json({
       success: true,
       data: {
         ...parsed,
-        source: "gemini-ai",
+        source: sourceName,
       },
+      provider,
       ...parsed,
       content: parsed.content || "Export briefing generated successfully.",
-      source: "gemini-ai",
+      source: sourceName,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Export intelligence engine call failed.";
-    console.error("Export API error:", message);
-    const status = message.includes("required") || message.includes("exceeds") ? 400 : 503;
-    res.status(status).json({ 
+    console.error("Export API error:", err);
+    if (err instanceof AIProviderError) {
+      res.status(err.statusCode).json({
+        success: false,
+        error: err.message,
+        code: err.code,
+      });
+      return;
+    }
+    res.status(503).json({ 
       success: false, 
-      error: message 
+      error: "AI service is temporarily unavailable. Please try again later.",
+      code: "AI_PROVIDER_UNAVAILABLE",
     });
   }
 });
 
 // 5. Business Planning & Growth Suite Endpoint
 app.post("/api/ai/business", async (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
   try {
-    const { toolType, inputData } = req.body;
+    const { toolType, inputData } = req.body || {};
 
     if (!toolType || typeof toolType !== "string") {
-      res.status(400).json({ error: "toolType is required." });
+      res.status(400).json({ 
+        success: false, 
+        error: "toolType is required." 
+      });
       return;
     }
 
@@ -675,12 +658,34 @@ Input Data: ${JSON.stringify(inputData || {})}
 Provide a structured, highly actionable business deliverable in clear markdown format.
 Be rigorous, realistic, and commercially sound. Do not invent fake statistics or guaranteed financial outcomes.`;
 
-    const aiText = await generateWithGemini(prompt);
-    res.json({ content: aiText, source: "gemini-ai" });
+    const { text, provider } = await generateAICompletion(prompt);
+    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
+
+    res.status(200).json({ 
+      success: true,
+      data: {
+        content: text,
+        source: sourceName,
+      },
+      provider,
+      content: text, 
+      source: sourceName,
+    });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Business growth engine call failed.";
-    console.error("Business API error:", message);
-    res.status(503).json({ error: message });
+    console.error("Business API error:", err);
+    if (err instanceof AIProviderError) {
+      res.status(err.statusCode).json({
+        success: false,
+        error: err.message,
+        code: err.code,
+      });
+      return;
+    }
+    res.status(503).json({ 
+      success: false, 
+      error: "AI service is temporarily unavailable. Please try again later.",
+      code: "AI_PROVIDER_UNAVAILABLE",
+    });
   }
 });
 
