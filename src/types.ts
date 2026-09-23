@@ -3,9 +3,12 @@ export type ActiveTab = "home" | "seo" | "social" | "export" | "business" | "das
 export interface SavedItem {
   id: string;
   userId?: string;
-  type: "ai-assistant" | "seo" | "social" | "export" | "business";
+  type: "seo" | "social" | "export" | "business" | "assistant" | "ai-assistant";
   title: string;
   summary: string;
+  input?: Record<string, unknown> | string;
+  context?: string;
+  result?: Record<string, unknown> | string;
   content: string | Record<string, unknown>;
   createdAt: string;
   updatedAt?: string;
