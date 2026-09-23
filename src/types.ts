@@ -147,6 +147,18 @@ export interface ExportAnalysisResult {
   source?: string;
 }
 
+export interface AssistantResult {
+  answer: string;
+  actions: string[];
+  stepByStepPlan?: string[];
+  importantConsiderations?: string[];
+  nextSteps?: string[];
+  category?: string;
+  verificationNotice?: string;
+  content?: string;
+  source?: string;
+}
+
 export interface PricingPlan {
   id: string;
   name: string;
