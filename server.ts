@@ -1,7 +1,6 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
 import { performRealSeoAudit } from "./src/server/seoCrawler";
 import { generateAICompletion, AIProviderError, normalizeServerErrorMessage } from "./src/server/aiProvider";
 
@@ -9,6 +8,14 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Handle serverless runtimes (e.g. Vercel) where req.body has already been buffered/parsed
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  if (req.body !== undefined && req.body !== null) {
+    (req as any)._body = true;
+  }
+  next();
+});
 
 app.use(express.json({ limit: "1mb" }));
 
@@ -737,6 +744,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 // Vite middleware for dev / static serving for prod
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

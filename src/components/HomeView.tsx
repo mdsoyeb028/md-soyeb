@@ -93,16 +93,20 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       if (!contentTypeHeader.includes("application/json")) {
         const rawText = await res.text();
         const snippet = rawText.slice(0, 100).replace(/<[^>]*>/g, "").trim();
-        throw new Error(
-          `The server returned a non-JSON response (HTTP ${res.status}). ${
-            snippet ? `Detail: "${snippet}"` : "The AI Assistant service may be temporarily unavailable."
-          }`
-        );
+        let fallbackMsg = "The AI Assistant service is temporarily unavailable. Please try again.";
+        if (snippet && !snippet.toLowerCase().includes("server error")) {
+          fallbackMsg = `Server response: ${snippet}`;
+        }
+        throw new Error(fallbackMsg);
       }
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        const errorDetail = normalizeErrorMessage(data.error, `Server responded with status ${res.status}`);
+        let rawError = data?.error || data?.message || data?.detail || `Server responded with status ${res.status}`;
+        if (typeof rawError === "string" && rawError.toLowerCase().includes("server error")) {
+          rawError = "The AI Assistant service encountered a temporary server error. Please click Retry Consultation.";
+        }
+        const errorDetail = normalizeErrorMessage(rawError, "The AI Assistant service is temporarily unavailable. Please try again.");
         throw new Error(errorDetail);
       }
 
@@ -116,7 +120,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       if (err instanceof Error && err.name === "AbortError") {
         msg = "Request timed out after 40 seconds. Please try again with a shorter inquiry.";
       } else {
-        msg = normalizeErrorMessage(err, "AI Trade Advisor failed to process inquiry.");
+        const normalized = normalizeErrorMessage(err, "AI Trade Advisor failed to process inquiry.");
+        if (normalized.toLowerCase().includes("server error")) {
+          msg = "The AI Assistant service is temporarily experiencing high load. Please try again in a few moments.";
+        } else {
+          msg = normalized;
+        }
       }
       setErrorMessage(msg);
       setAssistantData(null);
