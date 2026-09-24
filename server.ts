@@ -155,10 +155,17 @@ app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasGroqKey: Boolean(process.env.GROQ_API_KEY),
     hasOpenRouterKey: Boolean(process.env.OPENROUTER_API_KEY),
     timestamp: new Date().toISOString(),
   });
 });
+
+function getProviderSourceName(provider: "gemini" | "groq" | "openrouter"): string {
+  if (provider === "gemini") return "gemini-ai";
+  if (provider === "groq") return "groq-ai";
+  return "openrouter-free";
+}
 
 // 1. Central AI Business Assistant
 app.post("/api/ai/assistant", async (req, res) => {
@@ -261,7 +268,7 @@ Respond ONLY with strictly valid JSON matching this exact structure:
       `\n\n> **Notice:** ${parsed.verificationNotice || "Needs verification with the relevant official authority or professional advisor."}`,
     ].join("");
 
-    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
+    const sourceName = getProviderSourceName(provider);
 
     res.status(200).json({
       success: true,
@@ -291,7 +298,7 @@ Respond ONLY with strictly valid JSON matching this exact structure:
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service is temporarily unavailable. Please try again later.",
+      error: "AI service temporarily unavailable",
       code: "AI_PROVIDER_UNAVAILABLE",
     });
   }
@@ -320,7 +327,7 @@ app.post("/api/ai/seo", async (req, res) => {
 
     // Perform live webpage audit with SSRF protection (NEVER replaced by AI)
     const auditResult = await performRealSeoAudit(url, keyword);
-    let aiProvider: "gemini" | "openrouter" | "none" = "none";
+    let aiProvider: "gemini" | "groq" | "openrouter" | "none" = "none";
 
     // Enrich with tailored AI semantic recommendations using provider fallback
     const enrichmentPrompt = `You are a technical SEO expert. Here is real crawled data from the website "${auditResult.normalizedUrl}":
@@ -486,7 +493,7 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
 
     const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
     const parsed = safeParseJson<any>(text);
-    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
+    const sourceName = getProviderSourceName(provider);
 
     res.status(200).json({
       success: true,
@@ -510,7 +517,7 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service is temporarily unavailable. Please try again later.",
+      error: "AI service temporarily unavailable",
       code: "AI_PROVIDER_UNAVAILABLE",
     });
   }
@@ -625,7 +632,7 @@ Respond with strictly valid JSON according to this exact JSON schema:
 
     const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
     const parsed = safeParseJson<any>(text);
-    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
+    const sourceName = getProviderSourceName(provider);
 
     res.status(200).json({
       success: true,
@@ -650,7 +657,7 @@ Respond with strictly valid JSON according to this exact JSON schema:
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service is temporarily unavailable. Please try again later.",
+      error: "AI service temporarily unavailable",
       code: "AI_PROVIDER_UNAVAILABLE",
     });
   }
@@ -678,7 +685,7 @@ Provide a structured, highly actionable business deliverable in clear markdown f
 Be rigorous, realistic, and commercially sound. Do not invent fake statistics or guaranteed financial outcomes.`;
 
     const { text, provider } = await generateAICompletion(prompt);
-    const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
+    const sourceName = getProviderSourceName(provider);
 
     res.status(200).json({ 
       success: true,
@@ -702,7 +709,7 @@ Be rigorous, realistic, and commercially sound. Do not invent fake statistics or
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service is temporarily unavailable. Please try again later.",
+      error: "AI service temporarily unavailable",
       code: "AI_PROVIDER_UNAVAILABLE",
     });
   }
