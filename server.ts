@@ -65,6 +65,25 @@ if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   timer.unref?.();
 }
 
+/**
+ * Robust JSON parser that strips markdown code blocks or extracts JSON payloads
+ */
+function safeParseJson<T = Record<string, unknown>>(raw: string): T {
+  let clean = raw.trim();
+  if (clean.startsWith("```")) {
+    clean = clean.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+  try {
+    return JSON.parse(clean) as T;
+  } catch {
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]) as T;
+    }
+    throw new Error("Unable to parse JSON from AI response");
+  }
+}
+
 const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -223,7 +242,7 @@ Respond ONLY with strictly valid JSON matching this exact structure:
 }`;
 
     const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
-    const parsed = JSON.parse(text);
+    const parsed = safeParseJson<any>(text);
 
     const markdownContent = [
       `### Strategy & Direct Answer\n${parsed.answer || ""}`,
@@ -322,7 +341,7 @@ Generate optimized meta title and meta description recommendations for this exac
     try {
       const { text, provider } = await generateAICompletion(enrichmentPrompt, { jsonMode: true, timeoutMs: 12000 });
       aiProvider = provider;
-      const parsed = JSON.parse(text);
+      const parsed = safeParseJson<any>(text);
 
       if (parsed.improvedTitle) auditResult.metaTitle = parsed.improvedTitle;
       if (parsed.improvedDescription) auditResult.metaDescription = parsed.improvedDescription;
@@ -466,7 +485,7 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
 }`;
 
     const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
-    const parsed = JSON.parse(text);
+    const parsed = safeParseJson<any>(text);
     const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
 
     res.status(200).json({
@@ -605,7 +624,7 @@ Respond with strictly valid JSON according to this exact JSON schema:
 }`;
 
     const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
-    const parsed = JSON.parse(text);
+    const parsed = safeParseJson<any>(text);
     const sourceName = provider === "gemini" ? "gemini-ai" : "openrouter-free";
 
     res.status(200).json({

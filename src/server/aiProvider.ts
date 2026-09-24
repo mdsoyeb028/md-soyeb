@@ -122,17 +122,25 @@ async function callGemini(
     },
   });
 
-  const timeoutMs = options?.timeoutMs || 16000;
+  const timeoutMs = options?.timeoutMs || 25000;
   let lastError: Error | null = null;
 
   for (const model of GEMINI_CANDIDATE_MODELS) {
     let timer: NodeJS.Timeout | null = null;
     try {
       // Timeout promise wrapper
+      const config: Record<string, unknown> = {};
+      if (options?.systemPrompt) {
+        config.systemInstruction = options.systemPrompt;
+      }
+      if (options?.jsonMode) {
+        config.responseMimeType = "application/json";
+      }
+
       const generatePromise = ai.models.generateContent({
         model,
         contents: prompt,
-        ...(options?.jsonMode ? { config: { responseMimeType: "application/json" } } : {}),
+        ...(Object.keys(config).length > 0 ? { config } : {}),
       });
 
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -151,6 +159,10 @@ async function callGemini(
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error(String(err));
       console.warn(`Gemini (${model}) failed: ${lastError.message}`);
+      // If error is transient rate-limit or spike, give brief pause before next candidate
+      if (lastError.message.includes("429") || lastError.message.includes("503") || lastError.message.includes("demand") || lastError.message.includes("exhausted")) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
       // Continue to next candidate model
     } finally {
       if (timer) clearTimeout(timer);
@@ -173,7 +185,7 @@ async function callOpenRouterFallback(
   }
 
   const freeModels = await getRuntimeFreeOpenRouterModels();
-  const timeoutMs = options?.timeoutMs || 16000;
+  const timeoutMs = options?.timeoutMs || 25000;
   let lastError: Error | null = null;
 
   // Try top 4 free models from the discovered runtime free list
