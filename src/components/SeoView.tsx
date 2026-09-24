@@ -19,6 +19,7 @@ import {
   Layers
 } from "lucide-react";
 import { SavedItem, SeoAnalysisResult } from "../types";
+import { normalizeErrorMessage } from "../utils/errorUtils";
 
 interface SeoViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -65,14 +66,15 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
-        throw new Error(data.error || `SEO audit could not be completed (HTTP ${res.status}).`);
+        const errorDetail = normalizeErrorMessage(data.error, `SEO audit could not be completed (HTTP ${res.status}).`);
+        throw new Error(errorDetail);
       }
 
-      const auditData: SeoAnalysisResult = data.audit || data;
+      const auditData: SeoAnalysisResult = data.audit || data.data || data;
       setSeoData(auditData);
     } catch (err: unknown) {
       console.error("SEO Audit Error:", err);
-      const msg = err instanceof Error ? err.message : "Failed to audit website. Please check the URL and try again.";
+      const msg = normalizeErrorMessage(err, "Failed to audit website. Please check the URL and try again.");
       setErrorMessage(msg);
       setSeoData(null); // Never replace failed real requests with fake data
     } finally {

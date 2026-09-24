@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { ActiveTab, SavedItem, AssistantResult } from "../types";
 import { QUICK_PROMPTS } from "../data/mockData";
+import { normalizeErrorMessage } from "../utils/errorUtils";
 
 interface HomeViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -101,7 +102,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        throw new Error(data.error || `Server responded with status ${res.status}`);
+        const errorDetail = normalizeErrorMessage(data.error, `Server responded with status ${res.status}`);
+        throw new Error(errorDetail);
       }
 
       const payload = data.data || data;
@@ -111,12 +113,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       clearTimeout(timeoutId);
       console.error("AI Assistant error:", err);
       let msg = "AI Trade Advisor failed to process inquiry.";
-      if (err instanceof Error) {
-        if (err.name === "AbortError") {
-          msg = "Request timed out after 40 seconds. Please try again with a shorter inquiry.";
-        } else {
-          msg = err.message;
-        }
+      if (err instanceof Error && err.name === "AbortError") {
+        msg = "Request timed out after 40 seconds. Please try again with a shorter inquiry.";
+      } else {
+        msg = normalizeErrorMessage(err, "AI Trade Advisor failed to process inquiry.");
       }
       setErrorMessage(msg);
       setAssistantData(null);

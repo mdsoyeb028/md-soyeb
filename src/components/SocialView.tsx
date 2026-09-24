@@ -18,6 +18,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { SavedItem, SocialMediaResult } from "../types";
+import { normalizeErrorMessage } from "../utils/errorUtils";
 
 interface SocialViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -84,14 +85,15 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        throw new Error(data.error || `Social content generation failed (HTTP ${res.status}).`);
+        const errorDetail = normalizeErrorMessage(data.error, `Social content generation failed (HTTP ${res.status}).`);
+        throw new Error(errorDetail);
       }
 
       const result: SocialMediaResult = data.data || data;
       setSocialData(result);
     } catch (err: unknown) {
       console.error("Social generation error:", err);
-      const msg = err instanceof Error ? err.message : "Failed to generate social media strategy.";
+      const msg = normalizeErrorMessage(err, "Failed to generate social media strategy.");
       setErrorMessage(msg);
       setSocialData(null); // Never replace failed real requests with fake data
     } finally {

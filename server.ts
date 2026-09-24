@@ -3,7 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { performRealSeoAudit } from "./src/server/seoCrawler";
-import { generateAICompletion, AIProviderError } from "./src/server/aiProvider";
+import { generateAICompletion, AIProviderError, normalizeServerErrorMessage } from "./src/server/aiProvider";
 
 dotenv.config();
 
@@ -291,15 +291,15 @@ Respond ONLY with strictly valid JSON matching this exact structure:
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({
         success: false,
-        error: err.message,
-        code: err.code,
+        error: normalizeServerErrorMessage(err.message),
+        code: err.code || "AI_PROVIDER_ERROR",
       });
       return;
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service temporarily unavailable",
-      code: "AI_PROVIDER_UNAVAILABLE",
+      error: normalizeServerErrorMessage(err, "AI service temporarily unavailable"),
+      code: "AI_PROVIDER_ERROR",
     });
   }
 });
@@ -372,12 +372,13 @@ Generate optimized meta title and meta description recommendations for this exac
       ...auditResult,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "SEO audit could not be completed.";
+    const message = normalizeServerErrorMessage(err, "SEO audit could not be completed.");
     console.error("SEO Audit Error:", message);
     const status = message.includes("SSRF") || message.includes("Invalid URL") || message.includes("empty") ? 400 : 502;
     res.status(status).json({ 
       success: false, 
-      error: message 
+      error: message,
+      code: "AI_PROVIDER_ERROR",
     });
   }
 });
@@ -510,15 +511,15 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({
         success: false,
-        error: err.message,
-        code: err.code,
+        error: normalizeServerErrorMessage(err.message),
+        code: err.code || "AI_PROVIDER_ERROR",
       });
       return;
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service temporarily unavailable",
-      code: "AI_PROVIDER_UNAVAILABLE",
+      error: normalizeServerErrorMessage(err, "AI service temporarily unavailable"),
+      code: "AI_PROVIDER_ERROR",
     });
   }
 });
@@ -650,15 +651,15 @@ Respond with strictly valid JSON according to this exact JSON schema:
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({
         success: false,
-        error: err.message,
-        code: err.code,
+        error: normalizeServerErrorMessage(err.message),
+        code: err.code || "AI_PROVIDER_ERROR",
       });
       return;
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service temporarily unavailable",
-      code: "AI_PROVIDER_UNAVAILABLE",
+      error: normalizeServerErrorMessage(err, "AI service temporarily unavailable"),
+      code: "AI_PROVIDER_ERROR",
     });
   }
 });
@@ -702,15 +703,15 @@ Be rigorous, realistic, and commercially sound. Do not invent fake statistics or
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({
         success: false,
-        error: err.message,
-        code: err.code,
+        error: normalizeServerErrorMessage(err.message),
+        code: err.code || "AI_PROVIDER_ERROR",
       });
       return;
     }
     res.status(503).json({ 
       success: false, 
-      error: "AI service temporarily unavailable",
-      code: "AI_PROVIDER_UNAVAILABLE",
+      error: normalizeServerErrorMessage(err, "AI service temporarily unavailable"),
+      code: "AI_PROVIDER_ERROR",
     });
   }
 });

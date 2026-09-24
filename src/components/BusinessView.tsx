@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SavedItem } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
+import { normalizeErrorMessage } from "../utils/errorUtils";
 
 interface BusinessViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -92,14 +93,16 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `Server responded with status ${res.status}`);
+      if (!res.ok || data.success === false) {
+        const errorDetail = normalizeErrorMessage(data.error, `Server responded with status ${res.status}`);
+        throw new Error(errorDetail);
       }
 
-      setResultText(data.content || "Business brief generated.");
+      const payload = data.data || data;
+      setResultText(payload.content || data.content || "Business brief generated.");
     } catch (err: unknown) {
       console.error("Business tool error:", err);
-      const msg = err instanceof Error ? err.message : "Failed to generate business blueprint.";
+      const msg = normalizeErrorMessage(err, "Failed to generate business blueprint.");
       setErrorMessage(msg);
       setResultText(null); // Never replace failed real requests with fake data
     } finally {

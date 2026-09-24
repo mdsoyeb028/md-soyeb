@@ -4,7 +4,7 @@ export class AIProviderError extends Error {
   code: string;
   statusCode: number;
 
-  constructor(message = "AI service temporarily unavailable", code = "AI_PROVIDER_UNAVAILABLE", statusCode = 503) {
+  constructor(message = "AI service temporarily unavailable. Please try again in a moment.", code = "AI_PROVIDER_ERROR", statusCode = 503) {
     super(message);
     this.name = "AIProviderError";
     this.code = code;
@@ -554,10 +554,42 @@ export async function generateAICompletion(
 
   // Step 4: All providers failed or not configured
   throw new AIProviderError(
-    "AI service temporarily unavailable",
-    "AI_PROVIDER_UNAVAILABLE",
+    "AI service temporarily unavailable. Please try again in a moment.",
+    "AI_PROVIDER_ERROR",
     503
   );
+}
+
+/**
+ * Normalizes any server-side error into a clean, human-readable string.
+ * Prevents secrets or raw [object Object] leaks.
+ */
+export function normalizeServerErrorMessage(
+  err: unknown,
+  fallback = "AI service temporarily unavailable"
+): string {
+  if (!err) return fallback;
+  if (typeof err === "string") {
+    const trimmed = err.trim();
+    if (!trimmed || trimmed === "[object Object]") return fallback;
+    // Strip possible API keys or bearer tokens
+    return trimmed.replace(/Bearer\s+[A-Za-z0-9_\-\.]+/gi, "Bearer [REDACTED]");
+  }
+  if (err instanceof Error) {
+    const msg = (err.message || "").trim();
+    if (!msg || msg === "[object Object]") return fallback;
+    return msg.replace(/Bearer\s+[A-Za-z0-9_\-\.]+/gi, "Bearer [REDACTED]");
+  }
+  if (typeof err === "object") {
+    const obj = err as Record<string, unknown>;
+    if (typeof obj.message === "string" && obj.message.trim() && obj.message.trim() !== "[object Object]") {
+      return obj.message.trim().replace(/Bearer\s+[A-Za-z0-9_\-\.]+/gi, "Bearer [REDACTED]");
+    }
+    if (typeof obj.error === "string" && obj.error.trim() && obj.error.trim() !== "[object Object]") {
+      return obj.error.trim().replace(/Bearer\s+[A-Za-z0-9_\-\.]+/gi, "Bearer [REDACTED]");
+    }
+  }
+  return fallback;
 }
 
 /**

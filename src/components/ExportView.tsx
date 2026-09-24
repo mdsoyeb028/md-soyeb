@@ -25,6 +25,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { SavedItem, ExportAnalysisResult } from "../types";
+import { normalizeErrorMessage } from "../utils/errorUtils";
 
 interface ExportViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -120,7 +121,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        throw new Error(data.error || `Export intelligence analysis failed (HTTP ${res.status}).`);
+        const errorDetail = normalizeErrorMessage(data.error, `Export intelligence analysis failed (HTTP ${res.status}).`);
+        throw new Error(errorDetail);
       }
 
       const payload = data.data || data;
@@ -128,7 +130,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
       setResultContent(payload.content || data.content || "Report generated successfully.");
     } catch (err: unknown) {
       console.error("Export Action Error:", err);
-      const msg = err instanceof Error ? err.message : "Failed to generate export strategy.";
+      const msg = normalizeErrorMessage(err, "Failed to generate export strategy.");
       setErrorMessage(msg);
       setResultContent(null);
       setExportData(null);
