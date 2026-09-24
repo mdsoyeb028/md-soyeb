@@ -1,9 +1,8 @@
-import type { Request, Response } from "express";
-import { app } from "../server";
+import { sendJsonResponse } from "../src/server/serverlessHttp";
 
-export default function handler(req: Request, res: Response) {
-  if (req.url && !req.url.startsWith("/api/")) {
-    req.url = "/api" + (req.url.startsWith("/") ? req.url : `/${req.url}`);
-  }
-  return app(req, res);
+export default function handler(req: any, res: any) {
+  sendJsonResponse(res, 404, {
+    success: false,
+    error: `API route ${req.method} ${req.url || ""} not found.`,
+  });
 }

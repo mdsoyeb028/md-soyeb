@@ -794,6 +794,34 @@ export function normalizeServerErrorMessage(
 }
 
 /**
+ * Robust JSON parser that strips markdown code blocks or extracts JSON payloads
+ */
+export function safeParseJson<T = Record<string, unknown>>(raw: string): T {
+  let clean = raw.trim();
+  if (clean.startsWith("```")) {
+    clean = clean.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+  try {
+    return JSON.parse(clean) as T;
+  } catch {
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]) as T;
+    }
+    throw new Error("Unable to parse JSON from AI response");
+  }
+}
+
+/**
+ * Maps provider type to a clean display source name
+ */
+export function getProviderSourceName(provider: AIProvider): string {
+  if (provider === "gemini") return "gemini-ai";
+  if (provider === "groq") return "groq-ai";
+  return "openrouter-free";
+}
+
+/**
  * Diagnostic helpers
  */
 export async function getActiveOpenRouterFreeConfig(): Promise<string[]> {
