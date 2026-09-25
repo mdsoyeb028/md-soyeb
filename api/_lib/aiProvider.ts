@@ -65,10 +65,12 @@ export function cleanApiKey(val: string | undefined): string | null {
 
   // Validate that key is not an empty placeholder or dummy template
   if (
-    cleaned.length < 15 ||
-    cleaned.includes("...") ||
+    !cleaned ||
     cleaned.toLowerCase().includes("placeholder") ||
-    cleaned.toLowerCase().includes("your_")
+    cleaned.toLowerCase().includes("your_") ||
+    cleaned.toLowerCase() === "my_gemini_api_key" ||
+    cleaned.toLowerCase() === "my_groq_api_key" ||
+    cleaned.toLowerCase() === "my_openrouter_api_key"
   ) {
     return null;
   }
@@ -180,9 +182,11 @@ export function categorizeError(err: unknown): { status: number | string; catego
 }
 
 // 1. Primary Gemini models in priority order:
+// gemini-3.1-flash-lite: Fast, lightweight model specified for high responsiveness
 // gemini-3.8-flash: Standard Flash model for general text tasks
 // gemini-flash-latest: Official production alias
 const GEMINI_CANDIDATE_MODELS = [
+  "gemini-3.1-flash-lite",
   "gemini-3.8-flash",
   "gemini-flash-latest",
 ];
