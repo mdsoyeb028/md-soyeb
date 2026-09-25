@@ -53,13 +53,41 @@ export function sanitizeString(val: string): string {
 }
 
 /**
- * Clean environment variable values that may have been pasted with 'export KEY=' or extra quotes.
+ * Clean environment variable values that may have been pasted with 'export KEY=' or extra quotes,
+ * and filter out invalid dummy placeholders.
  */
 export function cleanApiKey(val: string | undefined): string | null {
   if (!val) return null;
-  let cleaned = val.replace(/^export\s+[A-Za-z0-9_]+\s*=\s*/i, "").trim();
+  let cleaned = val.trim();
+  cleaned = cleaned.replace(/^export\s+/i, "").trim();
+  cleaned = cleaned.replace(/^[A-Za-z0-9_]+\s*=\s*/, "").trim();
   cleaned = cleaned.replace(/^["']|["']$/g, "").trim();
-  return cleaned.length >= 8 ? cleaned : null;
+
+  // Validate that key is not an empty placeholder or dummy template
+  if (
+    cleaned.length < 15 ||
+    cleaned.includes("...") ||
+    cleaned.toLowerCase().includes("placeholder") ||
+    cleaned.toLowerCase().includes("your_")
+  ) {
+    return null;
+  }
+  return cleaned;
+}
+
+/**
+ * Resolves provider API keys from environment with support for common aliases
+ */
+export function getGeminiKey(): string | null {
+  return cleanApiKey(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY);
+}
+
+export function getGroqKey(): string | null {
+  return cleanApiKey(process.env.GROQ_API_KEY || process.env.GROQ_KEY);
+}
+
+export function getOpenRouterKey(): string | null {
+  return cleanApiKey(process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY || process.env.OPEN_ROUTER_API_KEY);
 }
 
 /**
@@ -80,13 +108,13 @@ export function logProviderAttemptError(details: SafeLogDetails): void {
 /**
  * Extract an HTTP status code and category from unknown provider errors
  */
-function categorizeError(err: unknown): { status: number | string; category: string; message: string } {
+export function categorizeError(err: unknown): { status: number | string; category: string; message: string } {
   let status: number | string = "N/A";
   let rawMsg = "Unknown error";
 
   if (err instanceof Error) {
     rawMsg = err.message || "Unknown error";
-    if (err.name === "AbortError" || rawMsg.includes("timed out")) {
+    if (err.name === "AbortError" || rawMsg.includes("timed out") || rawMsg.includes("timeout")) {
       return { status: 408, category: "TIMEOUT", message: "Request timed out" };
     }
   } else if (typeof err === "string") {
@@ -118,14 +146,27 @@ function categorizeError(err: unknown): { status: number | string; category: str
     else if (status === 403) category = "ACCESS_DENIED";
     else if (status === 404) category = "MODEL_NOT_FOUND";
     else if (status === 429) category = "RATE_LIMIT_OR_QUOTA";
+    else if (status === 500) category = "INTERNAL_SERVER_ERROR";
+    else if (status === 502) category = "BAD_GATEWAY";
+    else if (status === 503) category = "PROVIDER_UNAVAILABLE";
+    else if (status === 504) category = "GATEWAY_TIMEOUT";
     else if (status >= 500 && status <= 504) category = "PROVIDER_UNAVAILABLE";
   } else {
-    if (rawMsg.includes("429") || rawMsg.includes("quota") || rawMsg.includes("exhausted")) {
+    if (rawMsg.includes("429") || rawMsg.includes("quota") || rawMsg.includes("exhausted") || rawMsg.includes("RESOURCE_EXHAUSTED")) {
       category = "RATE_LIMIT_OR_QUOTA";
       status = 429;
-    } else if (rawMsg.includes("503") || rawMsg.includes("demand") || rawMsg.includes("unavailable")) {
+    } else if (rawMsg.includes("503") || rawMsg.includes("demand") || rawMsg.includes("unavailable") || rawMsg.includes("overloaded")) {
       category = "PROVIDER_UNAVAILABLE";
       status = 503;
+    } else if (rawMsg.includes("502") || rawMsg.includes("bad gateway")) {
+      category = "BAD_GATEWAY";
+      status = 502;
+    } else if (rawMsg.includes("504") || rawMsg.includes("gateway timeout")) {
+      category = "GATEWAY_TIMEOUT";
+      status = 504;
+    } else if (rawMsg.includes("500") || rawMsg.includes("internal server")) {
+      category = "INTERNAL_SERVER_ERROR";
+      status = 500;
     } else if (rawMsg.includes("401") || rawMsg.includes("API key not valid") || rawMsg.includes("Authentication")) {
       category = "AUTH_FAILED";
       status = 401;
@@ -138,22 +179,20 @@ function categorizeError(err: unknown): { status: number | string; category: str
   return { status, category, message: sanitizeString(rawMsg) };
 }
 
-// 1. Gemini candidate models (ordered by verified reliability, speed, and tier)
+// 1. Primary Gemini models in priority order:
+// gemini-3.8-flash: Standard Flash model for general text tasks
+// gemini-flash-latest: Official production alias
 const GEMINI_CANDIDATE_MODELS = [
-  "gemini-3.1-flash-lite", // Blazing fast, generous limits, verified available
-  "gemini-3.8-flash",      // Standard Flash model for basic text tasks
-  "gemini-flash-latest",   // Official production alias
-  "gemini-3.1-pro-preview",// Pro fallback
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
 ];
 
-// 2. Groq candidate models (verified active chat/completion models)
+// 2. Groq candidate models (verified active chat/completion models; excludes deprecated 404 models like llama-3.3-70b-versatile)
 const DEFAULT_GROQ_CANDIDATE_MODELS = [
-  "qwen/qwen3.8-27b",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
+  "qwen/qwen3.8-27b",
   "allam-2-7b",
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
 ];
 
 let cachedGroqModels: string[] = [];
@@ -162,9 +201,7 @@ let lastGroqModelsFetch = 0;
 // 3. Fallback baseline free models on OpenRouter (if runtime discovery is unavailable)
 const DEFAULT_OPENROUTER_FREE_MODELS = [
   "qwen/qwen3.8-27b:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "meta-llama/llama-3.1-8b-instruct:free",
-  "mistralai/mistral-small-3.2-24b-instruct:free",
+  "liquid/lfm-2.5-2.6b:free",
   "openrouter/auto",
 ];
 
@@ -175,7 +212,7 @@ const MODELS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 /**
  * Dynamically queries Groq for currently active text completion/chat models
  */
-async function getRuntimeGroqModels(apiKey: string): Promise<string[]> {
+export async function getRuntimeGroqModels(apiKey: string): Promise<string[]> {
   const now = Date.now();
   if (cachedGroqModels.length > 0 && now - lastGroqModelsFetch < MODELS_CACHE_TTL_MS) {
     return cachedGroqModels;
@@ -183,7 +220,7 @@ async function getRuntimeGroqModels(apiKey: string): Promise<string[]> {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
+    const timeout = setTimeout(() => controller.abort(), 4000);
 
     const res = await fetch("https://api.groq.com/openai/v1/models", {
       signal: controller.signal,
@@ -201,7 +238,7 @@ async function getRuntimeGroqModels(apiKey: string): Promise<string[]> {
           id: string;
           active?: boolean;
         }
-        // Strictly filter out non-chat / guard / audio / moderation models
+        // Filter out non-chat / guard / audio / moderation models
         const activeIds = json.data
           .filter((m: GroqModelItem) => {
             if (m.active === false) return false;
@@ -213,7 +250,8 @@ async function getRuntimeGroqModels(apiKey: string): Promise<string[]> {
               id.includes("guard") ||
               id.includes("safeguard") ||
               id.includes("orpheus") ||
-              id.includes("vision")
+              id.includes("vision") ||
+              id.includes("versatile") // Exclude models that return 404
             ) {
               return false;
             }
@@ -222,15 +260,13 @@ async function getRuntimeGroqModels(apiKey: string): Promise<string[]> {
           .map((m: GroqModelItem) => m.id);
 
         if (activeIds.length > 0) {
-          // Sort chat models: prioritize versatile qwen, gpt-oss, llama, and allam
           const sorted = [...activeIds].sort((a: string, b: string) => {
             const score = (name: string) => {
               const lower = name.toLowerCase();
-              if (lower.includes("qwen3.8") || lower.includes("qwen-3")) return 100;
-              if (lower.includes("gpt-oss-120b")) return 90;
+              if (lower.includes("gpt-oss-120b")) return 100;
+              if (lower.includes("gpt-oss-20b")) return 95;
+              if (lower.includes("qwen3.8") || lower.includes("qwen-3")) return 90;
               if (lower.includes("llama-3.3-70b")) return 85;
-              if (lower.includes("gpt-oss-20b")) return 80;
-              if (lower.includes("llama-3.1-8b")) return 75;
               if (lower.includes("allam")) return 70;
               return 10;
             };
@@ -258,7 +294,7 @@ async function getRuntimeGroqModels(apiKey: string): Promise<string[]> {
 /**
  * Dynamically queries OpenRouter for currently available free models
  */
-async function getRuntimeFreeOpenRouterModels(): Promise<string[]> {
+export async function getRuntimeFreeOpenRouterModels(): Promise<string[]> {
   const now = Date.now();
   if (cachedOpenRouterFreeModels.length > 0 && now - lastOpenRouterModelsFetch < MODELS_CACHE_TTL_MS) {
     return cachedOpenRouterFreeModels;
@@ -266,7 +302,7 @@ async function getRuntimeFreeOpenRouterModels(): Promise<string[]> {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
+    const timeout = setTimeout(() => controller.abort(), 4000);
 
     const res = await fetch("https://openrouter.ai/api/v1/models", {
       signal: controller.signal,
@@ -304,8 +340,8 @@ async function getRuntimeFreeOpenRouterModels(): Promise<string[]> {
 
         if (freeList.length > 0) {
           const sorted = [...freeList].sort((a: string, b: string) => {
-            const rankA = /qwen|llama|mistral|deepseek/i.test(a) ? 1 : 0;
-            const rankB = /qwen|llama|mistral|deepseek/i.test(b) ? 1 : 0;
+            const rankA = /qwen|liquid|llama|mistral|deepseek/i.test(a) ? 1 : 0;
+            const rankB = /qwen|liquid|llama|mistral|deepseek/i.test(b) ? 1 : 0;
             return rankB - rankA;
           });
 
@@ -329,12 +365,15 @@ async function getRuntimeFreeOpenRouterModels(): Promise<string[]> {
 
 /**
  * 1. Attempt generation using Gemini as Primary Provider
+ * - Strict timeout per attempt (6500ms)
+ * - Immediate failover: If Gemini returns 503 (high demand), 429 (quota), 500, 502, 504,
+ *   or times out, immediately throws so caller instantly fails over to Groq.
  */
-async function callGemini(
+export async function callGemini(
   prompt: string,
   options?: AIGenerateOptions
 ): Promise<AICompletionResult> {
-  const apiKey = cleanApiKey(process.env.GEMINI_API_KEY);
+  const apiKey = getGeminiKey();
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
@@ -346,11 +385,13 @@ async function callGemini(
     },
   });
 
-  const timeoutMs = options?.timeoutMs || 25000;
+  const perAttemptTimeoutMs = options?.timeoutMs ? Math.min(options.timeoutMs, 7000) : 6500;
   let lastError: Error | null = null;
 
-  for (const model of GEMINI_CANDIDATE_MODELS) {
+  for (let i = 0; i < GEMINI_CANDIDATE_MODELS.length; i++) {
+    const model = GEMINI_CANDIDATE_MODELS[i];
     let timer: NodeJS.Timeout | null = null;
+
     try {
       const config: Record<string, unknown> = {};
       if (options?.systemPrompt) {
@@ -368,8 +409,8 @@ async function callGemini(
 
       const timeoutPromise = new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error(`Gemini model ${model} request timed out after ${timeoutMs}ms`)),
-          timeoutMs
+          () => reject(new Error(`Gemini model ${model} timed out after ${perAttemptTimeoutMs}ms`)),
+          perAttemptTimeoutMs
         );
       });
 
@@ -385,6 +426,7 @@ async function callGemini(
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const { status, category, message } = categorizeError(err);
+
       logProviderAttemptError({
         provider: "gemini",
         model,
@@ -393,9 +435,26 @@ async function callGemini(
         sanitizedMessage: message,
       });
 
-      // Brief backoff if 429 quota or 503 spike encountered before checking next candidate
-      if (status === 429 || status === 503 || message.includes("429") || message.includes("503")) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
+      // Immediate failover triggers:
+      // If Gemini returns 503 (high demand), 429 (quota), 500, 502, 504, or times out,
+      // throw immediately so generateAICompletion directly hands off to Groq!
+      if (
+        status === 503 ||
+        status === 429 ||
+        status === 500 ||
+        status === 502 ||
+        status === 504 ||
+        category === "PROVIDER_UNAVAILABLE" ||
+        category === "RATE_LIMIT_OR_QUOTA" ||
+        category === "TIMEOUT" ||
+        message.includes("high demand") ||
+        message.includes("quota")
+      ) {
+        throw new Error(`Gemini ${category} (HTTP ${status}): ${message}`);
+      }
+
+      if (i === GEMINI_CANDIDATE_MODELS.length - 1) {
+        break;
       }
     } finally {
       if (timer) clearTimeout(timer);
@@ -407,22 +466,26 @@ async function callGemini(
 
 /**
  * 2. Attempt generation using Groq as Secondary Fallback Provider
+ * - Fast inference (typically 500-1500ms)
+ * - Dynamic model discovery + verified text models
+ * - Strict 7500ms timeout
+ * - Continues across candidate models on per-model rate limits
  */
-async function callGroqFallback(
+export async function callGroqFallback(
   prompt: string,
   options?: AIGenerateOptions
 ): Promise<AICompletionResult> {
-  const apiKey = cleanApiKey(process.env.GROQ_API_KEY);
+  const apiKey = getGroqKey();
   if (!apiKey) {
     throw new Error("GROQ_API_KEY is not configured.");
   }
 
   const candidateModels = await getRuntimeGroqModels(apiKey);
-  const timeoutMs = options?.timeoutMs || 25000;
+  const timeoutMs = options?.timeoutMs ? Math.min(options.timeoutMs, 8000) : 7500;
   let lastError: Error | null = null;
 
-  // Try top candidate models
-  const modelsToTry = candidateModels.slice(0, 4);
+  // Try top 3 candidate models
+  const modelsToTry = candidateModels.slice(0, 3);
 
   for (const model of modelsToTry) {
     let timeoutId: NodeJS.Timeout | null = null;
@@ -534,9 +597,8 @@ async function callGroqFallback(
         sanitizedMessage: message,
       });
 
-      if (status === 429 || status === 503) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-      }
+      // Groq TPM/RPM limits are model-specific. If one model is rate-limited, continue to next candidate model!
+      continue;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
@@ -548,21 +610,21 @@ async function callGroqFallback(
 /**
  * 3. Attempt generation using OpenRouter as Tertiary Fallback Provider (Free models only)
  */
-async function callOpenRouterFallback(
+export async function callOpenRouterFallback(
   prompt: string,
   options?: AIGenerateOptions
 ): Promise<AICompletionResult> {
-  const apiKey = cleanApiKey(process.env.OPENROUTER_API_KEY);
-  if (!apiKey || apiKey.length < 15) {
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is not configured or invalid for fallback.");
   }
 
   const freeModels = await getRuntimeFreeOpenRouterModels();
-  const timeoutMs = options?.timeoutMs || 25000;
+  const timeoutMs = options?.timeoutMs ? Math.min(options.timeoutMs, 8500) : 8000;
   let lastError: Error | null = null;
 
-  // Try top free models from discovered runtime free list
-  const candidateModelsToTry = freeModels.slice(0, 4);
+  // Try top 2 free models
+  const candidateModelsToTry = freeModels.slice(0, 2);
 
   for (const model of candidateModelsToTry) {
     let timeoutId: NodeJS.Timeout | null = null;
@@ -686,28 +748,30 @@ async function callOpenRouterFallback(
  * Universal AI Completion function with 3-Tier Multi-Provider Fallback
  *
  * Priority Flow:
- * 1. Primary: Gemini (gemini-3.1-flash-lite, gemini-3.8-flash, gemini-flash-latest, etc.)
- * 2. Secondary: Groq (qwen/qwen3.8-27b, openai/gpt-oss-120b, llama-3.3-70b-versatile, etc.)
- * 3. Tertiary: OpenRouter Free Models (dynamic discovery + baseline)
+ * 1. Primary: Gemini (gemini-3.8-flash -> gemini-flash-latest)
+ * 2. Secondary: Groq (openai/gpt-oss-120b, openai/gpt-oss-20b, qwen/qwen3.8-27b)
+ * 3. Tertiary: OpenRouter Free Models (qwen/qwen3.8-27b:free, openrouter/auto)
  *
- * If all providers fail: throws AIProviderError with AI_PROVIDER_ERROR code
+ * A Gemini 503, 429, 500, 502, 504, or timeout NEVER stops the request.
+ * It immediately triggers failover to Groq, and if Groq fails, to OpenRouter.
  */
 export async function generateAICompletion(
   prompt: string,
   options?: AIGenerateOptions
 ): Promise<AICompletionResult> {
   // Step 1: Try Primary Provider (Gemini)
-  const geminiKey = cleanApiKey(process.env.GEMINI_API_KEY);
+  const geminiKey = getGeminiKey();
   if (geminiKey) {
     try {
       const result = await callGemini(prompt, options);
       return result;
     } catch (err: unknown) {
-      const { category, message } = categorizeError(err);
+      const { status, category, message } = categorizeError(err);
       logProviderAttemptError({
         provider: "gemini",
+        httpStatus: status,
         errorCategory: category,
-        sanitizedMessage: `Primary provider Gemini exhausted options: ${message}. Initiating Groq failover...`,
+        sanitizedMessage: `Primary provider Gemini failed (HTTP ${status} / ${category}): ${message}. Immediately failing over to Groq...`,
       });
     }
   } else {
@@ -715,27 +779,28 @@ export async function generateAICompletion(
   }
 
   // Step 2: Try Secondary Provider (Groq)
-  const groqKey = cleanApiKey(process.env.GROQ_API_KEY);
+  const groqKey = getGroqKey();
   if (groqKey) {
     try {
       const result = await callGroqFallback(prompt, options);
       console.info(`[AI Failover] Successfully generated response using secondary provider Groq (${result.modelUsed}).`);
       return result;
     } catch (err: unknown) {
-      const { category, message } = categorizeError(err);
+      const { status, category, message } = categorizeError(err);
       logProviderAttemptError({
         provider: "groq",
+        httpStatus: status,
         errorCategory: category,
-        sanitizedMessage: `Secondary provider Groq exhausted options: ${message}. Initiating OpenRouter failover...`,
+        sanitizedMessage: `Secondary provider Groq failed (HTTP ${status} / ${category}): ${message}. Immediately failing over to OpenRouter...`,
       });
     }
   } else {
-    console.info(`[AI Failover] GROQ_API_KEY not configured (optional). Proceeding to OpenRouter...`);
+    console.info(`[AI Failover] GROQ_API_KEY not configured or unavailable. Proceeding to OpenRouter...`);
   }
 
   // Step 3: Try Tertiary Provider (OpenRouter Free)
-  const openRouterKey = cleanApiKey(process.env.OPENROUTER_API_KEY);
-  if (openRouterKey && openRouterKey.length >= 15) {
+  const openRouterKey = getOpenRouterKey();
+  if (openRouterKey) {
     try {
       const result = await callOpenRouterFallback(prompt, options);
       console.info(
@@ -743,21 +808,22 @@ export async function generateAICompletion(
       );
       return result;
     } catch (err: unknown) {
-      const { category, message } = categorizeError(err);
+      const { status, category, message } = categorizeError(err);
       logProviderAttemptError({
         provider: "openrouter",
+        httpStatus: status,
         errorCategory: category,
         sanitizedMessage: `Tertiary provider OpenRouter failed: ${message}`,
       });
     }
   } else {
-    console.info(`[AI Failover] OPENROUTER_API_KEY not configured (optional).`);
+    console.info(`[AI Failover] OPENROUTER_API_KEY not configured or invalid.`);
   }
 
   // Step 4: All providers failed or not configured
   throw new AIProviderError(
-    "AI service temporarily unavailable. Please try again in a moment.",
-    "AI_PROVIDER_ERROR",
+    "All configured AI providers (Gemini, Groq, OpenRouter) are temporarily unavailable. Please try again in a moment.",
+    "ALL_PROVIDERS_UNAVAILABLE",
     503
   );
 }

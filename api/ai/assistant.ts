@@ -149,7 +149,8 @@ Respond ONLY with strictly valid JSON matching this exact structure:
       source: sourceName,
     });
   } catch (err: unknown) {
-    console.error("Assistant API error:", err);
+    const safeError = normalizeServerErrorMessage(err, "AI service temporarily unavailable. Please try again in a moment.");
+    console.error("Assistant API error:", safeError);
     if (err instanceof AIProviderError) {
       sendJsonResponse(res, err.statusCode, {
         success: false,
@@ -160,7 +161,7 @@ Respond ONLY with strictly valid JSON matching this exact structure:
     }
     sendJsonResponse(res, 503, {
       success: false,
-      error: normalizeServerErrorMessage(err, "AI service temporarily unavailable"),
+      error: safeError,
       code: "AI_PROVIDER_ERROR",
     });
   }
