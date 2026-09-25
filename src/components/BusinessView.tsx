@@ -85,16 +85,31 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
     try {
       const res = await fetch("/api/ai/business", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({
           toolType: selectedToolId,
           inputData,
         }),
       });
 
+      const contentTypeHeader = res.headers.get("content-type") || "";
+      if (!contentTypeHeader.includes("application/json")) {
+        const rawText = await res.text();
+        const snippet = rawText.slice(0, 150).replace(/<[^>]*>/g, "").trim();
+        throw new Error(
+          `The server returned an unexpected response (HTTP ${res.status}). ${
+            snippet ? `Detail: "${snippet}"` : "The business strategy API may be temporarily unreachable."
+          }`
+        );
+      }
+
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        const errorDetail = normalizeErrorMessage(data.error, `Server responded with status ${res.status}`);
+        const rawError = data?.error || data?.message || data?.detail || `Business blueprint analysis failed (HTTP ${res.status}).`;
+        const errorDetail = normalizeErrorMessage(rawError, `Server responded with status ${res.status}`);
         throw new Error(errorDetail);
       }
 

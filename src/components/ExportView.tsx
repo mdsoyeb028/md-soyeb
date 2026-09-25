@@ -111,9 +111,9 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
       const contentTypeHeader = res.headers.get("content-type") || "";
       if (!contentTypeHeader.includes("application/json")) {
         const rawText = await res.text();
-        const snippet = rawText.slice(0, 100).replace(/<[^>]*>/g, "").trim();
+        const snippet = rawText.slice(0, 150).replace(/<[^>]*>/g, "").trim();
         throw new Error(
-          `The server returned a non-JSON response (HTTP ${res.status}). ${
+          `The server returned an unexpected response (HTTP ${res.status}). ${
             snippet ? `Detail: "${snippet}"` : "The export intelligence API may be temporarily unreachable."
           }`
         );
@@ -121,7 +121,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        const errorDetail = normalizeErrorMessage(data.error, `Export intelligence analysis failed (HTTP ${res.status}).`);
+        const rawError = data?.error || data?.message || data?.detail || `Export intelligence analysis failed (HTTP ${res.status}).`;
+        const errorDetail = normalizeErrorMessage(rawError, `Export intelligence analysis failed (HTTP ${res.status}).`);
         throw new Error(errorDetail);
       }
 

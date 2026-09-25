@@ -75,9 +75,9 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
       const contentTypeHeader = res.headers.get("content-type") || "";
       if (!contentTypeHeader.includes("application/json")) {
         const rawText = await res.text();
-        const snippet = rawText.slice(0, 100).replace(/<[^>]*>/g, "").trim();
+        const snippet = rawText.slice(0, 150).replace(/<[^>]*>/g, "").trim();
         throw new Error(
-          `The server returned a non-JSON response (HTTP ${res.status}). ${
+          `The server returned an unexpected response (HTTP ${res.status}). ${
             snippet ? `Detail: "${snippet}"` : "The social media AI endpoint may be temporarily unreachable."
           }`
         );
@@ -85,7 +85,8 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        const errorDetail = normalizeErrorMessage(data.error, `Social content generation failed (HTTP ${res.status}).`);
+        const rawError = data?.error || data?.message || data?.detail || `Social content generation failed (HTTP ${res.status}).`;
+        const errorDetail = normalizeErrorMessage(rawError, `Social content generation failed (HTTP ${res.status}).`);
         throw new Error(errorDetail);
       }
 

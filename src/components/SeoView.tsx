@@ -55,9 +55,9 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
       const contentType = res.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         const rawText = await res.text();
-        const snippet = rawText.slice(0, 100).replace(/<[^>]*>/g, "").trim();
+        const snippet = rawText.slice(0, 150).replace(/<[^>]*>/g, "").trim();
         throw new Error(
-          `The server returned a non-JSON response (HTTP ${res.status}). ${
+          `The server returned an unexpected response (HTTP ${res.status}). ${
             snippet ? `Detail: "${snippet}"` : "The SEO audit endpoint may be temporarily unreachable."
           }`
         );
@@ -66,7 +66,8 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
-        const errorDetail = normalizeErrorMessage(data.error, `SEO audit could not be completed (HTTP ${res.status}).`);
+        const rawError = data?.error || data?.message || data?.detail || `SEO audit failed (HTTP ${res.status}).`;
+        const errorDetail = normalizeErrorMessage(rawError, `SEO audit could not be completed (HTTP ${res.status}).`);
         throw new Error(errorDetail);
       }
 

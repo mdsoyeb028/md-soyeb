@@ -92,20 +92,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       const contentTypeHeader = res.headers.get("content-type") || "";
       if (!contentTypeHeader.includes("application/json")) {
         const rawText = await res.text();
-        const snippet = rawText.slice(0, 100).replace(/<[^>]*>/g, "").trim();
-        let fallbackMsg = "The AI Assistant service is temporarily unavailable. Please try again.";
-        if (snippet && !snippet.toLowerCase().includes("server error")) {
-          fallbackMsg = `Server response: ${snippet}`;
-        }
+        const snippet = rawText.slice(0, 150).replace(/<[^>]*>/g, "").trim();
+        const fallbackMsg = snippet 
+          ? `Server returned HTTP ${res.status}: ${snippet}` 
+          : `The AI Assistant service returned an unexpected response (HTTP ${res.status}).`;
         throw new Error(fallbackMsg);
       }
 
       const data = await res.json();
       if (!res.ok || data.success === false) {
-        let rawError = data?.error || data?.message || data?.detail || `Server responded with status ${res.status}`;
-        if (typeof rawError === "string" && rawError.toLowerCase().includes("server error")) {
-          rawError = "The AI Assistant service encountered a temporary server error. Please click Retry Consultation.";
-        }
+        const rawError = data?.error || data?.message || data?.detail || `AI service returned error (HTTP ${res.status})`;
         const errorDetail = normalizeErrorMessage(rawError, "The AI Assistant service is temporarily unavailable. Please try again.");
         throw new Error(errorDetail);
       }
@@ -120,12 +116,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       if (err instanceof Error && err.name === "AbortError") {
         msg = "Request timed out after 40 seconds. Please try again with a shorter inquiry.";
       } else {
-        const normalized = normalizeErrorMessage(err, "AI Trade Advisor failed to process inquiry.");
-        if (normalized.toLowerCase().includes("server error")) {
-          msg = "The AI Assistant service is temporarily experiencing high load. Please try again in a few moments.";
-        } else {
-          msg = normalized;
-        }
+        msg = normalizeErrorMessage(err, "AI Trade Advisor failed to process inquiry.");
       }
       setErrorMessage(msg);
       setAssistantData(null);

@@ -4,8 +4,8 @@ import {
   normalizeServerErrorMessage,
   safeParseJson,
   getProviderSourceName,
-} from "../../src/server/aiProvider";
-import { parseRequestBody, sendJsonResponse } from "../../src/server/serverlessHttp";
+} from "../_lib/aiProvider.ts";
+import { parseRequestBody, sendJsonResponse } from "../_lib/serverlessHttp.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
