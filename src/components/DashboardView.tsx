@@ -8,19 +8,20 @@ import {
   Download, 
   ExternalLink, 
   Check, 
-  FolderPlus,
-  Globe2,
-  Calendar,
-  Briefcase,
-  SearchCode,
-  Smartphone,
-  Sparkles,
-  LogIn,
-  LogOut,
-  ShieldCheck,
-  AlertCircle,
-  Loader2,
-  FileText
+  FolderPlus, 
+  Globe2, 
+  Calendar, 
+  Briefcase, 
+  SearchCode, 
+  Smartphone, 
+  Sparkles, 
+  LogIn, 
+  LogOut, 
+  ShieldCheck, 
+  AlertCircle, 
+  Loader2, 
+  FileText,
+  Zap
 } from "lucide-react";
 import { SavedItem, ActiveTab } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -55,24 +56,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Real Calculated Metrics (Zero fake/mock numbers)
   const totalReports = savedItems.length;
+  const problemSolverReports = savedItems.filter((i) => 
+    i.type === "assistant" || 
+    i.type === "ai-assistant" || 
+    i.category?.includes("Problem Solver") || 
+    i.tags?.includes("Problem Solver") ||
+    i.tags?.includes("7-Day Action Plan")
+  ).length;
   const seoReports = savedItems.filter((i) => i.type === "seo").length;
   const socialReports = savedItems.filter((i) => i.type === "social").length;
   const exportReports = savedItems.filter((i) => i.type === "export").length;
-  const businessReports = savedItems.filter((i) => i.type === "business" || i.type === "assistant" || i.type === "ai-assistant").length;
+  const businessReports = savedItems.filter((i) => i.type === "business").length;
 
   const typeFilters = [
     { id: "all", label: `${t("dashboard.filterAll", "All Reports")} (${totalReports})` },
+    { id: "problem_solver", label: `⚡ Problem Solvers (${problemSolverReports})` },
     { id: "seo", label: `${t("dashboard.filterSeo", "SEO")} (${seoReports})` },
     { id: "social", label: `${t("dashboard.filterSocial", "Social")} (${socialReports})` },
     { id: "export", label: `${t("dashboard.filterExport", "Export")} (${exportReports})` },
-    { id: "business", label: `${t("dashboard.filterBusiness", "Business")} (${businessReports})` },
+    { id: "business", label: `${t("dashboard.filterBusiness", "Business Strategy")} (${businessReports})` },
   ];
 
   const filteredItems = savedItems.filter((item) => {
+    const isProblemSolver = 
+      item.type === "assistant" || 
+      item.type === "ai-assistant" || 
+      item.category?.includes("Problem Solver") || 
+      item.tags?.includes("Problem Solver") ||
+      item.tags?.includes("7-Day Action Plan");
+
     const matchesType = 
       selectedType === "all" || 
-      item.type === selectedType || 
-      (selectedType === "business" && (item.type === "assistant" || item.type === "ai-assistant"));
+      (selectedType === "problem_solver" && isProblemSolver) ||
+      (selectedType === item.type && !isProblemSolver) ||
+      (selectedType === "business" && item.type === "business");
 
     const queryLower = searchQuery.toLowerCase();
     const matchesSearch = 
@@ -117,7 +134,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   };
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: string, category?: string) => {
+    if (type === "assistant" || type === "ai-assistant" || category?.includes("Problem Solver")) {
+      return <Zap className="w-3.5 h-3.5 text-amber-400" />;
+    }
     switch (type) {
       case "seo":
         return <SearchCode className="w-3.5 h-3.5 text-cyan-400" />;
@@ -307,8 +327,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="flex-1 pr-2">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800/60">
-                      {getTypeIcon(item.type)}
-                      <span>{item.type}</span>
+                      {getTypeIcon(item.type, item.category)}
+                      <span>{item.category || item.type}</span>
                     </span>
                     <span className="text-[10px] text-slate-500">
                       {new Date(item.createdAt).toLocaleDateString()} at {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -385,8 +405,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex-1 pr-3">
                 <span className="text-[10px] text-cyan-400 uppercase font-bold tracking-wider inline-flex items-center gap-1">
-                  {getTypeIcon(activeItemModal.type)}
-                  <span>{activeItemModal.type} • {activeItemModal.category || "General"}</span>
+                  {getTypeIcon(activeItemModal.type, activeItemModal.category)}
+                  <span>{activeItemModal.category || activeItemModal.type}</span>
                 </span>
                 <h3 className="font-bold text-sm sm:text-base text-white">
                   {activeItemModal.title}

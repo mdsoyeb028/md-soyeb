@@ -208,6 +208,50 @@ Respond strictly in valid JSON matching this schema:
       "completed": false
     }
   ],
+  "sevenDayPlan": [
+    {
+      "day": "Day 1",
+      "focus": "Immediate Conversion / Value Fix",
+      "action": "Replace homepage headline and primary CTA with high-converting versions",
+      "materialSnippet": "Snippet of prepared copy to deploy"
+    },
+    {
+      "day": "Day 2",
+      "focus": "Positioning & Trust Building",
+      "action": "Deploy trust section and core value proposition",
+      "materialSnippet": "Prepared value prop"
+    },
+    {
+      "day": "Day 3",
+      "focus": "Direct Buyer Outreach",
+      "action": "Send 15 personalized outreach messages to ideal target customers",
+      "materialSnippet": "Ready WhatsApp/Email template"
+    },
+    {
+      "day": "Day 4",
+      "focus": "Objection Handling & Follow-up",
+      "action": "Follow up with prospects using prepared sequence and answer common objections",
+      "materialSnippet": "Ready follow-up message"
+    },
+    {
+      "day": "Day 5",
+      "focus": "Organic Visibility & GBP/Social",
+      "action": "Publish high-converting social carousel or Google Business update",
+      "materialSnippet": "Ready social/GBP post"
+    },
+    {
+      "day": "Day 6",
+      "focus": "Referral & Partnership Activation",
+      "action": "Reach out to past clients or strategic partners with referral offer",
+      "materialSnippet": "Ready referral script"
+    },
+    {
+      "day": "Day 7",
+      "focus": "Measurement & Pipeline Review",
+      "action": "Review conversion clicks, outreach replies, and calibrate next week's activity target",
+      "materialSnippet": "Activity target metrics"
+    }
+  ],
   "actionPlan": {
     "today": ["Action today"],
     "next7Days": ["Action 1 for week 1", "Action 2 for week 1"],
@@ -249,6 +293,10 @@ Respond strictly in valid JSON matching this schema:
       markdownSections.push(`\n\n### 🎯 Recommended Strategic Actions\n${parsed.actions.map((a: string) => `* ${a}`).join("\n")}`);
     }
 
+    if (Array.isArray(parsed.sevenDayPlan) && parsed.sevenDayPlan.length > 0) {
+      markdownSections.push(`\n\n### 📅 7-Day Action Plan\n${parsed.sevenDayPlan.map((d: any) => `* **${d.day} (${d.focus})**: ${d.action}${d.materialSnippet ? ` \n  *Asset:* \`${d.materialSnippet}\`` : ""}`).join("\n")}`);
+    }
+
     if (Array.isArray(parsed.stepByStepPlan) && parsed.stepByStepPlan.length > 0) {
       markdownSections.push(`\n\n### 🗺️ Step-by-Step Execution Plan\n${parsed.stepByStepPlan.map((s: string, idx: number) => `${idx + 1}. ${s}`).join("\n")}`);
     }
@@ -278,6 +326,7 @@ Respond strictly in valid JSON matching this schema:
         readyMaterials: Array.isArray(parsed.readyMaterials) ? parsed.readyMaterials : [],
         nextAction: parsed.nextAction || null,
         implementationSteps: Array.isArray(parsed.implementationSteps) ? parsed.implementationSteps : [],
+        sevenDayPlan: Array.isArray(parsed.sevenDayPlan) ? parsed.sevenDayPlan : [],
         actionPlan: parsed.actionPlan || null,
         websiteCrawlData,
         actions: Array.isArray(parsed.actions) ? parsed.actions : [],
