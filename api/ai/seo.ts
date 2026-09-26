@@ -29,7 +29,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const body = await parseRequestBody(req);
-    const { url, keyword } = body || {};
+    const { url, keyword, language, languageName } = body || {};
 
     if (!url || typeof url !== "string" || !url.trim()) {
       sendJsonResponse(res, 400, {
@@ -47,6 +47,8 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    const selectedLanguage = languageName || language || "English";
+
     // Perform live webpage audit with SSRF protection (NEVER replaced by AI)
     const auditResult = await performRealSeoAudit(url, keyword);
     let aiProvider: "gemini" | "groq" | "openrouter" | "none" = "none";
@@ -59,12 +61,16 @@ Detected Meta Description: "${auditResult.detectedData.metaDescription}" (${audi
 Detected H1: "${auditResult.detectedData.h1Samples.join(" | ")}"
 Detected H2s: "${auditResult.detectedData.h2Samples.join(" | ")}"
 Mathematical SEO Health Score: ${auditResult.score}/100
+Target Output Language: "${selectedLanguage}"
+
+CRITICAL INSTRUCTION:
+Provide recommendations (improved description and additional insight) in "${selectedLanguage}". Preserve technical keywords, brand names, and URLs.
 
 Generate optimized meta title and meta description recommendations for this exact page. Return strictly JSON:
 {
   "improvedTitle": "string between 45 and 60 chars",
-  "improvedDescription": "string between 120 and 155 chars with call to action",
-  "additionalInsight": "string summarizing one high-impact technical or on-page win"
+  "improvedDescription": "string between 120 and 155 chars with call to action in ${selectedLanguage}",
+  "additionalInsight": "string summarizing one high-impact technical or on-page win in ${selectedLanguage}"
 }`;
 
     try {

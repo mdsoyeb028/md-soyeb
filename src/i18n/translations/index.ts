@@ -9,6 +9,8 @@ import { de } from "./de";
 import { pt } from "./pt";
 import { zh } from "./zh";
 import { ja } from "./ja";
+import { ru } from "./ru";
+import { ko } from "./ko";
 
 export type { TranslationSchema };
 
@@ -28,6 +30,8 @@ export const TRANSLATIONS: Record<string, Partial<TranslationSchema>> = {
   "zh-TW": zh,
   zh,
   ja,
+  ru,
+  ko,
   "es-ES": es,
   "es-MX": es,
   "en-US": en,

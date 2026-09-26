@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Globe, ChevronDown, Search, Check, X } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { LanguageInfo, LanguageRegion } from "../i18n/languages";
@@ -13,16 +13,90 @@ const CATEGORIES: Array<{ id: string; label: string; region?: LanguageRegion }> 
   { id: "all", label: "All Languages" },
 ];
 
+/**
+ * High-performance real-time fuzzy matching function.
+ * Evaluates exact match, prefixes, substrings, subsequence order, and typo tolerance.
+ */
+function fuzzyScore(text: string, query: string): number {
+  if (!text || !query) return 0;
+
+  const tNorm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const qNorm = query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  if (tNorm === qNorm) return 100;
+  if (tNorm.startsWith(qNorm)) return 90;
+  if (tNorm.includes(qNorm)) return 75;
+
+  // Subsequence match (e.g. "bngl" matching "bengali", "esp" in "espanol", "arbc" in "arabic")
+  let qIdx = 0;
+  let tIdx = 0;
+  let consecutive = 0;
+  let score = 0;
+
+  while (qIdx < qNorm.length && tIdx < tNorm.length) {
+    if (qNorm[qIdx] === tNorm[tIdx]) {
+      qIdx++;
+      consecutive++;
+      score += 8 + consecutive * 2;
+    } else {
+      consecutive = 0;
+    }
+    tIdx++;
+  }
+
+  if (qIdx === qNorm.length) {
+    return Math.max(score, 45);
+  }
+
+  // Typo tolerance for queries >= 3 characters (1 edit distance allowance)
+  if (qNorm.length >= 3) {
+    const words = tNorm.split(/[\s\-()]+/);
+    for (const w of words) {
+      if (Math.abs(w.length - qNorm.length) <= 1) {
+        let diff = 0;
+        const minLen = Math.min(w.length, qNorm.length);
+        for (let i = 0; i < minLen; i++) {
+          if (w[i] !== qNorm[i]) diff++;
+        }
+        diff += Math.abs(w.length - qNorm.length);
+        if (diff <= 1) return 40;
+      }
+    }
+  }
+
+  return 0;
+}
+
 export const LanguageSelector: React.FC = () => {
   const { language, languageInfo, setLanguage, supportedLanguages, t, isRtl } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("popular");
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
+  const activeItemRef = useRef<HTMLButtonElement | null>(null);
 
-  // Close on outside click
+  // Focus management: open/close focus transitions
+  useEffect(() => {
+    if (isOpen) {
+      setFocusedIndex(-1);
+      // Ensure focus shifts to search input immediately upon opening
+      const timer = setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }, 30);
+      return () => clearTimeout(timer);
+    } else {
+      setFocusedIndex(-1);
+    }
+  }, [isOpen]);
+
+  // Click outside to close (supporting mouse and touch)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (
@@ -38,8 +112,6 @@ export const LanguageSelector: React.FC = () => {
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("touchstart", handleClickOutside);
-      // Auto focus search input
-      setTimeout(() => searchInputRef.current?.focus(), 50);
     }
 
     return () => {
@@ -48,30 +120,31 @@ export const LanguageSelector: React.FC = () => {
     };
   }, [isOpen]);
 
-  // Handle escape key
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
-        setIsOpen(false);
-        triggerRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
-
-  // Filtered languages based on search query or category
+  // Real-time fuzzy filtering across English name, native name, and language code
   const filteredLanguages = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim();
 
     if (q) {
-      return supportedLanguages.filter((l) => {
-        return (
-          l.code.toLowerCase().includes(q) ||
-          l.name.toLowerCase().includes(q) ||
-          l.nativeName.toLowerCase().includes(q)
-        );
-      });
+      const scoredList: Array<{ lang: LanguageInfo; score: number }> = [];
+
+      for (const l of supportedLanguages) {
+        // Test Code match (highest priority)
+        const codeScore = fuzzyScore(l.code, q) * 1.2;
+        // Test Native Name match (e.g. हिन्दी, বাংলা, اردو, Español, Français)
+        const nativeScore = fuzzyScore(l.nativeName, q);
+        // Test English Name match
+        const englishScore = fuzzyScore(l.name, q);
+
+        const bestScore = Math.max(codeScore, nativeScore, englishScore);
+        if (bestScore > 0) {
+          scoredList.push({ lang: l, score: bestScore });
+        }
+      }
+
+      // Sort by match relevance score descending
+      return scoredList
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.lang);
     }
 
     if (selectedCategory === "popular") {
@@ -90,34 +163,116 @@ export const LanguageSelector: React.FC = () => {
     return supportedLanguages;
   }, [searchQuery, selectedCategory, supportedLanguages]);
 
-  const handleSelectLanguage = (lang: LanguageInfo) => {
+  // Reset or adjust focusedIndex when filtered items change
+  useEffect(() => {
+    if (filteredLanguages.length > 0) {
+      setFocusedIndex(0);
+    } else {
+      setFocusedIndex(-1);
+    }
+  }, [filteredLanguages]);
+
+  // Scroll active item into view during keyboard navigation
+  useEffect(() => {
+    if (focusedIndex >= 0 && activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }
+  }, [focusedIndex]);
+
+  const handleSelectLanguage = useCallback((lang: LanguageInfo) => {
     setLanguage(lang.code);
     setIsOpen(false);
     setSearchQuery("");
+    // Return focus to trigger button for seamless accessibility
+    setTimeout(() => {
+      triggerRef.current?.focus();
+    }, 20);
+  }, [setLanguage]);
+
+  // Keyboard navigation handler for accessibility
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        if (filteredLanguages.length > 0) {
+          setFocusedIndex((prev) => (prev + 1) % filteredLanguages.length);
+        }
+        break;
+
+      case "ArrowUp":
+        e.preventDefault();
+        if (filteredLanguages.length > 0) {
+          setFocusedIndex((prev) => (prev - 1 + filteredLanguages.length) % filteredLanguages.length);
+        }
+        break;
+
+      case "Enter":
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < filteredLanguages.length) {
+          handleSelectLanguage(filteredLanguages[focusedIndex]);
+        }
+        break;
+
+      case "Escape":
+        e.preventDefault();
+        setIsOpen(false);
+        triggerRef.current?.focus();
+        break;
+
+      case "Home":
+        if (filteredLanguages.length > 0) {
+          e.preventDefault();
+          setFocusedIndex(0);
+        }
+        break;
+
+      case "End":
+        if (filteredLanguages.length > 0) {
+          e.preventDefault();
+          setFocusedIndex(filteredLanguages.length - 1);
+        }
+        break;
+
+      default:
+        break;
+    }
   };
 
-  // Compact code display: e.g. "EN", "HI", "BN", "AR", "ES", "PT-BR"
+  // Compact code display: e.g. "EN", "HI", "BN", "AR", "ES", "PT"
   const shortCode = language.toUpperCase().split("-")[0];
 
   return (
     <div className="relative inline-block text-left" ref={popoverRef}>
-      {/* Compact Trigger Button */}
+      {/* Compact Header Trigger Button */}
       <button
         ref={triggerRef}
         id="header-language-btn"
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
+        onKeyDown={handleKeyDown}
         aria-haspopup="dialog"
-        aria-label={`Select Language. Current: ${languageInfo.name}`}
+        aria-expanded={isOpen}
+        aria-controls="language-dropdown-dialog"
+        aria-label={`Select language. Currently active: ${languageInfo.nativeName} (${languageInfo.name})`}
         title={`${languageInfo.nativeName} (${languageInfo.name}) - ${t("header.changeLanguage", "Change Language")}`}
         className={`px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
           isOpen
-            ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-md shadow-cyan-500/20"
-            : "bg-slate-900/80 text-slate-200 hover:text-white border-slate-800 hover:border-slate-700"
+            ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-md shadow-cyan-500/20 ring-1 ring-cyan-500/30"
+            : "bg-slate-900/80 text-slate-200 hover:text-white border-slate-800 hover:border-slate-700 hover:bg-slate-800/90"
         }`}
       >
-        <Globe className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+        <Globe className="w-3.5 h-3.5 text-cyan-400 shrink-0" aria-hidden="true" />
         <span className="font-bold tracking-wide text-[11px] sm:text-xs">
           {shortCode}
         </span>
@@ -125,71 +280,107 @@ export const LanguageSelector: React.FC = () => {
           className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${
             isOpen ? "rotate-180 text-cyan-400" : ""
           }`}
+          aria-hidden="true"
         />
       </button>
 
       {/* Accessible Searchable Popover Dropdown */}
       {isOpen && (
         <div
+          id="language-dropdown-dialog"
           role="dialog"
           aria-modal="true"
-          aria-label="Language Selector"
+          aria-label="Worldwide Language Selector"
           className={`absolute z-50 mt-2 w-[310px] sm:w-[360px] max-w-[92vw] rounded-2xl bg-[#0c1222]/95 backdrop-blur-2xl border border-slate-700/80 shadow-2xl shadow-cyan-950/50 p-3 transition-all animate-in fade-in zoom-in-95 duration-150 ${
             isRtl ? "left-0 sm:left-0" : "right-0 sm:right-0"
           }`}
           style={{ top: "100%" }}
+          onKeyDown={handleKeyDown}
         >
           {/* Header & Title */}
           <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
             <div className="flex items-center gap-2">
-              <Globe className="w-4 h-4 text-cyan-400" />
+              <Globe className="w-4 h-4 text-cyan-400" aria-hidden="true" />
               <span className="text-xs font-bold text-white tracking-wide">
                 {t("header.changeLanguage", "Worldwide Languages")}
               </span>
             </div>
             <button
-              onClick={() => setIsOpen(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
-              aria-label={t("common.close", "Close")}
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                triggerRef.current?.focus();
+              }}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+              aria-label={t("common.close", "Close language selector")}
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           </div>
 
-          {/* Search Box */}
+          {/* Real-time Fuzzy Search Box with Accessible Combobox */}
           <div className="relative mb-2.5">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <label htmlFor="language-search-input" className="sr-only">
+              {t("header.searchLanguage", "Search language by English name, native name, or code")}
+            </label>
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
             <input
+              id="language-search-input"
               ref={searchInputRef}
               type="text"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={isOpen}
+              aria-controls="language-listbox"
+              aria-activedescendant={
+                focusedIndex >= 0 && filteredLanguages[focusedIndex]
+                  ? `lang-item-${filteredLanguages[focusedIndex].code}`
+                  : undefined
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("header.searchLanguage", "Search language, name or code...")}
+              placeholder={t("header.searchLanguage", "Search Hindi, हिन्दी, Spanish, Español, ar, etc...")}
               className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 text-xs text-white placeholder-slate-500 transition-all outline-none"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5"
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
                 title="Clear search"
+                aria-label="Clear search query"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3 h-3" aria-hidden="true" />
               </button>
             )}
           </div>
 
-          {/* Category Filter Pills (hidden when searching) */}
+          {/* Screen Reader Live Status */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {filteredLanguages.length} languages found. Use arrow keys to navigate and Enter to select.
+          </div>
+
+          {/* Category Filter Pills (hidden when active search query is entered) */}
           {!searchQuery && (
-            <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-2 scrollbar-none text-[10px]">
+            <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-2 scrollbar-none text-[10px]" role="tablist" aria-label="Language Regions">
               {CATEGORIES.map((cat) => {
                 const isCatActive = selectedCategory === cat.id;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-2 py-1 rounded-lg shrink-0 font-medium transition-all ${
+                    type="button"
+                    role="tab"
+                    aria-selected={isCatActive}
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      searchInputRef.current?.focus();
+                    }}
+                    className={`px-2 py-1 rounded-lg shrink-0 font-medium transition-all cursor-pointer ${
                       isCatActive
-                        ? "bg-cyan-500/25 text-cyan-300 border border-cyan-500/40"
+                        ? "bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 font-semibold"
                         : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-transparent hover:border-slate-800"
                     }`}
                   >
@@ -200,34 +391,48 @@ export const LanguageSelector: React.FC = () => {
             </div>
           )}
 
-          {/* Scrollable Language List */}
+          {/* Scrollable Language Listbox */}
           <div
-            className="max-h-[260px] sm:max-h-[300px] overflow-y-auto space-y-1 pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent"
-            tabIndex={0}
+            id="language-listbox"
+            ref={listboxRef}
+            role="listbox"
+            aria-label="Available languages"
+            className="max-h-[260px] sm:max-h-[300px] overflow-y-auto space-y-1 pr-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent focus:outline-none"
           >
             {filteredLanguages.length === 0 ? (
               <div className="py-6 text-center text-xs text-slate-400">
                 No language found matching "{searchQuery}"
               </div>
             ) : (
-              filteredLanguages.map((lang) => {
+              filteredLanguages.map((lang, index) => {
                 const isSelected =
                   language.toLowerCase() === lang.code.toLowerCase() ||
                   language.toLowerCase().startsWith(lang.code.toLowerCase() + "-");
+                const isFocused = index === focusedIndex;
 
                 return (
                   <button
                     key={lang.code}
+                    id={`lang-item-${lang.code}`}
+                    ref={isFocused ? (el) => { activeItemRef.current = el; } : undefined}
+                    role="option"
+                    aria-selected={isSelected}
+                    type="button"
                     onClick={() => handleSelectLanguage(lang)}
+                    onMouseEnter={() => setFocusedIndex(index)}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left text-xs transition-colors group cursor-pointer ${
-                      isSelected
+                      isFocused
+                        ? "bg-slate-800/90 text-white ring-1 ring-cyan-500/50"
+                        : isSelected
                         ? "bg-cyan-950/60 border border-cyan-500/40 text-cyan-300"
                         : "hover:bg-slate-800/60 text-slate-300 hover:text-white border border-transparent"
                     }`}
                   >
                     <div className="flex items-baseline gap-2 min-w-0 pr-2">
                       {/* Native language name in proper Unicode */}
-                      <span className="font-semibold text-white group-hover:text-cyan-300 transition-colors text-xs truncate">
+                      <span className={`font-semibold text-xs truncate ${
+                        isFocused || isSelected ? "text-cyan-300" : "text-white"
+                      }`}>
                         {lang.nativeName}
                       </span>
                       {/* English name */}
@@ -248,7 +453,7 @@ export const LanguageSelector: React.FC = () => {
                         {lang.code}
                       </span>
                       {isSelected && (
-                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" aria-hidden="true" />
                       )}
                     </div>
                   </button>
@@ -262,7 +467,7 @@ export const LanguageSelector: React.FC = () => {
             <span>
               Active: <strong className="text-white font-medium">{languageInfo.nativeName}</strong>
             </span>
-            <span className="text-[10px] text-slate-500">
+            <span className="text-[10px] text-slate-500 font-mono">
               {supportedLanguages.length} Languages
             </span>
           </div>
@@ -271,3 +476,6 @@ export const LanguageSelector: React.FC = () => {
     </div>
   );
 };
+
+// Also export as LanguageDropdown for complete compatibility
+export const LanguageDropdown = LanguageSelector;

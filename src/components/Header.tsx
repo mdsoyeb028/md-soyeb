@@ -52,11 +52,11 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Saved Reports / Client Dashboard shortcut */}
+          {/* Saved Reports / Client Dashboard shortcut (Desktop only) */}
           <button
             id="nav-saved-btn"
             onClick={() => setActiveTab("dashboard")}
-            className={`relative p-1.5 sm:p-2 rounded-xl border text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`hidden sm:flex relative p-1.5 sm:p-2 rounded-xl border text-xs font-semibold transition-all items-center gap-1.5 cursor-pointer ${
               activeTab === "dashboard"
                 ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm shadow-cyan-500/20"
                 : "bg-slate-900/70 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700"
@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
             title={t("header.savedBtn", "Saved Reports")}
           >
             <Bookmark className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />
-            <span className="hidden sm:inline">{t("header.savedBtn", "Saved")}</span>
+            <span>{t("header.savedBtn", "Saved")}</span>
             {savedCount > 0 && (
               <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 font-bold">
                 {savedCount}
@@ -72,21 +72,21 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* Pricing Button */}
+          {/* Pricing Button (Desktop only) */}
           <button
             id="nav-pricing-btn"
             onClick={() => setActiveTab("pricing")}
-            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer ${
+            className={`hidden sm:flex px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all items-center gap-1 sm:gap-1.5 cursor-pointer ${
               activeTab === "pricing"
                 ? "bg-purple-600/30 text-purple-200 border-purple-400/60 shadow-sm shadow-purple-500/20"
                 : "bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-purple-300 hover:text-white border-purple-500/30 hover:border-purple-400/60"
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden xs:inline">{t("header.plansBtn", "Plans")}</span>
+            <span>{t("header.plansBtn", "Plans")}</span>
           </button>
 
-          {/* Compact Worldwide Language Selector */}
+          {/* Compact Worldwide Language Selector (Visible on both Desktop and Mobile) */}
           <LanguageSelector />
 
           {/* Auth Button in Header */}

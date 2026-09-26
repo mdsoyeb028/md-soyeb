@@ -1,20 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Arabic', 'Noto Sans SC', 'Noto Sans JP', 'Noto Sans KR', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Noto Sans',
+    'Noto Sans Devanagari',
+    'Noto Sans Bengali',
+    'Noto Sans Arabic',
+    'Noto Sans Hebrew',
+    'Noto Sans SC',
+    'Noto Sans TC',
+    'Noto Sans JP',
+    'Noto Sans KR',
+    'Noto Sans Tamil',
+    'Noto Sans Telugu',
+    'Noto Sans Gujarati',
+    'Noto Sans Gurmukhi',
+    'Noto Sans Malayalam',
+    'Noto Sans Kannada',
+    'Noto Sans Oriya',
+    'Noto Sans Sinhala',
+    'Noto Sans Thai',
+    'Noto Sans Khmer',
+    'Noto Sans Lao',
+    'Noto Sans Myanmar',
+    'Noto Sans Ethiopic',
+    'Noto Sans Armenian',
+    'Noto Sans Georgian',
+    sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 [dir="rtl"] {
   text-align: right;
 }
 
-[dir="rtl"] input:not([type="url"]):not([type="email"]),
+[dir="rtl"] input:not([type="url"]):not([type="email"]):not([type="tel"]),
 [dir="rtl"] textarea {
   text-align: right;
 }
 
 [dir="rtl"] input[type="url"],
 [dir="rtl"] input[type="email"],
+[dir="rtl"] code,
+[dir="rtl"] pre,
 [dir="rtl"] .ltr-force {
   direction: ltr;
   text-align: left;
