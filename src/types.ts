@@ -150,6 +150,57 @@ export interface ExportAnalysisResult {
   source?: string;
 }
 
+export interface ReadyMaterial {
+  id: string;
+  category: 
+    | "website_copy" 
+    | "headline_cta" 
+    | "whatsapp_message" 
+    | "email_sequence" 
+    | "sales_script" 
+    | "objection_handling" 
+    | "google_business" 
+    | "social_content" 
+    | "faq" 
+    | "offer_positioning" 
+    | "other";
+  title: string;
+  description: string;
+  content: string; // The ready-to-copy exact text
+  oldVsNew?: { 
+    oldText: string; 
+    newText: string; 
+    reason: string; 
+  };
+  instructions?: string; // "I prepared everything. You only need to copy and paste/send it."
+}
+
+export interface NextActionItem {
+  title: string;
+  actionText: string;
+  materialToCopy?: string;
+  whereToUse: string;
+  stepIndex: number;
+}
+
+export interface ImplementationStep {
+  id: string;
+  stepNumber: number;
+  timeframe: string;
+  title: string;
+  action: string;
+  readyMaterialSnippet?: string;
+  completed?: boolean;
+}
+
+export interface DiagnosisDetails {
+  summary: string;
+  likelyBottlenecks: string[];
+  confirmedFindings: string[];
+  assumptions: string[];
+  priorityFix: string;
+}
+
 export interface AssistantResult {
   answer: string;
   actions: string[];
@@ -160,6 +211,27 @@ export interface AssistantResult {
   verificationNotice?: string;
   content?: string;
   source?: string;
+  // Self-Solving Problem Solver additions:
+  diagnosis?: DiagnosisDetails;
+  readyMaterials?: ReadyMaterial[];
+  nextAction?: NextActionItem;
+  implementationSteps?: ImplementationStep[];
+  actionPlan?: {
+    today?: string[];
+    next7Days?: string[];
+    next30Days?: string[];
+    next60Days?: string[];
+    next90Days?: string[];
+  };
+  websiteCrawlData?: {
+    url: string;
+    detectedTitle?: string;
+    detectedH1?: string[];
+    score?: number;
+    observableIssues?: string[];
+  };
+  isLowBudgetMode?: boolean;
+  problemType?: string;
 }
 
 export interface PricingPlan {
