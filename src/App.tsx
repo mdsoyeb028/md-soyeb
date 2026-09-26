@@ -22,6 +22,7 @@ import { BusinessView } from "./components/BusinessView";
 import { DashboardView } from "./components/DashboardView";
 import { PricingView } from "./components/PricingView";
 import { CheckCircle2, AlertCircle } from "lucide-react";
+import { LanguageProvider } from "./i18n/LanguageContext";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
@@ -148,87 +149,89 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen text-slate-100 selection:bg-cyan-500 selection:text-slate-950 font-sans relative antialiased">
-      {/* Background Elements */}
-      <BackgroundElements />
+    <LanguageProvider user={user}>
+      <div className="min-h-screen text-slate-100 selection:bg-cyan-500 selection:text-slate-950 font-sans relative antialiased">
+        {/* Background Elements */}
+        <BackgroundElements />
 
-      {/* Main Container Layout */}
-      <div className="relative z-10 flex flex-col min-h-screen">
-        {/* Header Bar */}
-        <Header
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          savedCount={savedItems.length}
-          user={user}
-          onSignIn={handleSignIn}
-          onSignOut={handleSignOut}
-        />
+        {/* Main Container Layout */}
+        <div className="relative z-10 flex flex-col min-h-screen">
+          {/* Header Bar */}
+          <Header
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            savedCount={savedItems.length}
+            user={user}
+            onSignIn={handleSignIn}
+            onSignOut={handleSignOut}
+          />
 
-        {/* Dynamic Mobile View Body */}
-        <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
-          {activeTab === "home" && (
-            <HomeView
-              setActiveTab={setActiveTab}
-              onSaveItem={handleSaveItem}
-              savedItemIds={savedItems.map((i) => i.id)}
-            />
-          )}
-
-          {activeTab === "seo" && (
-            <SeoView onSaveItem={handleSaveItem} />
-          )}
-
-          {activeTab === "social" && (
-            <SocialView onSaveItem={handleSaveItem} />
-          )}
-
-          {activeTab === "export" && (
-            <ExportView onSaveItem={handleSaveItem} />
-          )}
-
-          {activeTab === "business" && (
-            <BusinessView onSaveItem={handleSaveItem} />
-          )}
-
-          {activeTab === "dashboard" && (
-            <DashboardView
-              savedItems={savedItems}
-              user={user}
-              isLoading={isReportsLoading}
-              error={reportsError}
-              onDeleteItem={handleDeleteItem}
-              onSignIn={handleSignIn}
-              onSignOut={handleSignOut}
-              setActiveTab={setActiveTab}
-            />
-          )}
-
-          {activeTab === "pricing" && (
-            <PricingView />
-          )}
-        </main>
-
-        {/* Global Toast Notification */}
-        {toastMessage && (
-          <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-white text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 border transition-all ${
-            toastType === "warning" 
-              ? "bg-rose-950/90 border-rose-500/60 text-rose-200"
-              : toastType === "info"
-              ? "bg-slate-900/90 border-blue-500/50 text-blue-200"
-              : "bg-slate-900/90 border-cyan-500/50 text-white"
-          }`}>
-            {toastType === "warning" ? (
-              <AlertCircle className="w-4 h-4 text-rose-400" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+          {/* Dynamic Mobile View Body */}
+          <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
+            {activeTab === "home" && (
+              <HomeView
+                setActiveTab={setActiveTab}
+                onSaveItem={handleSaveItem}
+                savedItemIds={savedItems.map((i) => i.id)}
+              />
             )}
-            <span>{toastMessage}</span>
-          </div>
-        )}
 
-        {/* Bottom Fixed Navigation Bar */}
-        <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+            {activeTab === "seo" && (
+              <SeoView onSaveItem={handleSaveItem} />
+            )}
+
+            {activeTab === "social" && (
+              <SocialView onSaveItem={handleSaveItem} />
+            )}
+
+            {activeTab === "export" && (
+              <ExportView onSaveItem={handleSaveItem} />
+            )}
+
+            {activeTab === "business" && (
+              <BusinessView onSaveItem={handleSaveItem} />
+            )}
+
+            {activeTab === "dashboard" && (
+              <DashboardView
+                savedItems={savedItems}
+                user={user}
+                isLoading={isReportsLoading}
+                error={reportsError}
+                onDeleteItem={handleDeleteItem}
+                onSignIn={handleSignIn}
+                onSignOut={handleSignOut}
+                setActiveTab={setActiveTab}
+              />
+            )}
+
+            {activeTab === "pricing" && (
+              <PricingView />
+            )}
+          </main>
+
+          {/* Global Toast Notification */}
+          {toastMessage && (
+            <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-white text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 border transition-all ${
+              toastType === "warning" 
+                ? "bg-rose-950/90 border-rose-500/60 text-rose-200"
+                : toastType === "info"
+                ? "bg-slate-900/90 border-blue-500/50 text-blue-200"
+                : "bg-slate-900/90 border-cyan-500/50 text-white"
+            }`}>
+              {toastType === "warning" ? (
+                <AlertCircle className="w-4 h-4 text-rose-400" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+              )}
+              <span>{toastMessage}</span>
+            </div>
+          )}
+
+          {/* Bottom Fixed Navigation Bar */}
+          <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        </div>
       </div>
-    </div>
+    </LanguageProvider>
   );
 }

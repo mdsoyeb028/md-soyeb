@@ -42,6 +42,8 @@ export default async function handler(req: any, res: any) {
       budget,
       quantity,
       businessType,
+      language,
+      languageName,
     } = body || {};
 
     if (!productName || typeof productName !== "string" || !productName.trim()) {
@@ -78,6 +80,7 @@ export default async function handler(req: any, res: any) {
         ? buyerType.trim()
         : "B2B Wholesalers, Distributors & Importers";
     const selectedSize = businessSize || businessType || "Small to Medium Exporter";
+    const selectedLanguage = languageName || language || "English";
     const selectedQuestion =
       specificQuestion && typeof specificQuestion === "string" && specificQuestion.trim()
         ? specificQuestion.trim()
@@ -96,6 +99,11 @@ TRADE PARAMETERS:
 - Specific User Question / Inquiries: "${selectedQuestion || "Complete export feasibility, compliance, Incoterms, and buyer outreach strategy."}"
 - Sub-Tool Requested: "${selectedSubTool}"
 - Budget / Quantity Context: "${budget || "Commercial scale"} / ${quantity || "Standard export batches"}"
+- Target Output Language: "${selectedLanguage}"
+
+CRITICAL LANGUAGE INSTRUCTIONS:
+1. Respond in the user's selected language: ${selectedLanguage}. All generated analyses, checklists, drafts, and advice MUST be in ${selectedLanguage}.
+2. Do NOT translate: URLs, official trade codes (like HS codes, Incoterms abbreviations like FOB, CIF), emails, or domain names unless requested.
 
 CRITICAL ACCURACY & COMPLIANCE RULES:
 1. Do NOT invent or fabricate official regulations, import licenses, exact tariff duty percentages, mandatory HS codes, buyers, companies, phone numbers, email addresses, or market statistics.

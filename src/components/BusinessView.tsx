@@ -20,12 +20,14 @@ import {
 import { SavedItem } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface BusinessViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
 }
 
 export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
+  const { t, languageInfo } = useLanguage();
   const [selectedToolId, setSelectedToolId] = useState("pricing-calc");
 
   // General form inputs
@@ -92,6 +94,8 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
         body: JSON.stringify({
           toolType: selectedToolId,
           inputData,
+          language: languageInfo.code,
+          languageName: `${languageInfo.nativeName} (${languageInfo.name})`,
         }),
       });
 

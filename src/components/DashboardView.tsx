@@ -23,6 +23,7 @@ import {
   FileText
 } from "lucide-react";
 import { SavedItem, ActiveTab } from "../types";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface DashboardViewProps {
   savedItems: SavedItem[];
@@ -45,6 +46,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSignOut,
   setActiveTab
 }) => {
+  const { t } = useLanguage();
   const [selectedType, setSelectedType] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -59,11 +61,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const businessReports = savedItems.filter((i) => i.type === "business" || i.type === "assistant" || i.type === "ai-assistant").length;
 
   const typeFilters = [
-    { id: "all", label: `All Reports (${totalReports})` },
-    { id: "seo", label: `SEO (${seoReports})` },
-    { id: "social", label: `Social (${socialReports})` },
-    { id: "export", label: `Export (${exportReports})` },
-    { id: "business", label: `Business (${businessReports})` },
+    { id: "all", label: `${t("dashboard.filterAll", "All Reports")} (${totalReports})` },
+    { id: "seo", label: `${t("dashboard.filterSeo", "SEO")} (${seoReports})` },
+    { id: "social", label: `${t("dashboard.filterSocial", "Social")} (${socialReports})` },
+    { id: "export", label: `${t("dashboard.filterExport", "Export")} (${exportReports})` },
+    { id: "business", label: `${t("dashboard.filterBusiness", "Business")} (${businessReports})` },
   ];
 
   const filteredItems = savedItems.filter((item) => {

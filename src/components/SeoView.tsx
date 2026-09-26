@@ -20,12 +20,14 @@ import {
 } from "lucide-react";
 import { SavedItem, SeoAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface SeoViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
 }
 
 export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
+  const { t, language, languageInfo } = useLanguage();
   const [url, setUrl] = useState("https://md-soyeb.vercel.app");
   const [targetKeyword, setTargetKeyword] = useState("business growth export hub");
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +50,12 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify({ url: url.trim(), keyword: targetKeyword.trim() }),
+        body: JSON.stringify({ 
+          url: url.trim(), 
+          keyword: targetKeyword.trim(),
+          language: languageInfo.code,
+          languageName: `${languageInfo.nativeName} (${languageInfo.name})`,
+        }),
       });
 
       // Defensive check: Verify response content-type before parsing JSON to prevent "Unexpected token '<'"

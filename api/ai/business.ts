@@ -29,7 +29,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const body = await parseRequestBody(req);
-    const { toolType, inputData } = body || {};
+    const { toolType, inputData, language, languageName } = body || {};
 
     if (!toolType || typeof toolType !== "string") {
       sendJsonResponse(res, 400, {
@@ -39,9 +39,16 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    const selectedLanguage = languageName || language || "English";
+
     const prompt = `You are a senior commercial strategist and business growth advisor.
 Tool Requested: ${toolType}
 Input Data: ${JSON.stringify(inputData || {})}
+Target Output Language: ${selectedLanguage}
+
+CRITICAL LANGUAGE INSTRUCTIONS:
+1. Respond in the user's selected language: ${selectedLanguage}. All business advice, calculations explanations, steps, and deliverables MUST be in ${selectedLanguage}.
+2. Preserve proper technical terms, brand names, URLs, formulas, and currencies where appropriate.
 
 Provide a structured, highly actionable business deliverable in clear markdown format.
 Be rigorous, realistic, and commercially sound. Do not invent fake statistics or guaranteed financial outcomes.`;

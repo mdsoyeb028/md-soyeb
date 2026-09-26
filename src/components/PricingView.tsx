@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 import { PRICING_PLANS } from "../data/mockData";
 import { PricingPlan } from "../types";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export const PricingView: React.FC = () => {
+  const { t } = useLanguage();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<PricingPlan | null>(null);
   const [selectedGateway, setSelectedGateway] = useState<"stripe" | "razorpay" | "paypal">("stripe");
@@ -34,13 +36,13 @@ export const PricingView: React.FC = () => {
       <div className="text-center space-y-2 pt-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-950/80 border border-purple-500/30 text-purple-300 text-xs font-semibold backdrop-blur-md">
           <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-          <span>Flexible Plans for Modern Businesses & Exporters</span>
+          <span>{t("pricing.title", "Flexible Plans for Modern Businesses & Exporters")}</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-          Invest in Global Business Growth
+          {t("pricing.title", "Invest in Global Business Growth")}
         </h1>
         <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto">
-          Scale your international reach, dominate search rankings, and streamline buyer outreach with enterprise-grade trade tools.
+          {t("pricing.subtitle", "Scale your international reach, dominate search rankings, and streamline buyer outreach with enterprise-grade trade tools.")}
         </p>
 
         {/* Monthly vs Annual Toggle */}
@@ -53,7 +55,7 @@ export const PricingView: React.FC = () => {
                 : "text-slate-400 hover:text-white"
             }`}
           >
-            Monthly Billing
+            {t("pricing.monthly", "Monthly Billing")}
           </button>
           <button
             onClick={() => setBillingCycle("annual")}
@@ -63,7 +65,7 @@ export const PricingView: React.FC = () => {
                 : "text-slate-400 hover:text-white"
             }`}
           >
-            <span>Annual</span>
+            <span>{t("pricing.annual", "Annual")}</span>
             <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
               Save 20%
             </span>

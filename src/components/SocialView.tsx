@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Smartphone, 
   Instagram, 
@@ -19,19 +19,26 @@ import {
 } from "lucide-react";
 import { SavedItem, SocialMediaResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface SocialViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
 }
 
 export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
+  const { t, languageInfo } = useLanguage();
   const [platform, setPlatform] = useState<"Instagram" | "Facebook" | "YouTube" | "LinkedIn">("Instagram");
   const [business, setBusiness] = useState("Artisan Ceramic Exporter");
   const [category, setCategory] = useState("Ceramics & Global Home Decor");
   const [audience, setAudience] = useState("Interior Designers, Wholesalers & Eco-conscious Homeowners");
   const [topic, setTopic] = useState("Master Artisans, Handcrafting & Safe Global Freight");
-  const [language, setLanguage] = useState("English");
+  const [language, setLanguage] = useState(languageInfo.name);
   const [contentType, setContentType] = useState("Reel / Short Video & Behind-The-Scenes");
+
+  // Keep local language in sync when user changes global language
+  useEffect(() => {
+    setLanguage(languageInfo.name);
+  }, [languageInfo]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,7 +51,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
 
   const handleGenerateSocial = async () => {
     if (!business.trim()) {
-      setErrorMessage("Please enter your business or brand name before generating content.");
+      setErrorMessage(t("social.brandPlaceholder", "Please enter your business or brand name before generating content."));
       return;
     }
     if (isLoading) return;
@@ -66,7 +73,8 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
           category: category.trim(),
           audience: audience.trim(), 
           topic: topic.trim(),
-          language: language.trim(),
+          language: language.trim() || languageInfo.name,
+          languageName: `${languageInfo.nativeName} (${languageInfo.name})`,
           contentType: contentType.trim() 
         }),
       });

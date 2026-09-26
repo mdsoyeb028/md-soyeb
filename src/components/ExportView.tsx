@@ -26,12 +26,14 @@ import {
 } from "lucide-react";
 import { SavedItem, ExportAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface ExportViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
 }
 
 export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
+  const { t, languageInfo } = useLanguage();
   const [activeSubTool, setActiveSubTool] = useState<
     "opportunities" | "buyer-message" | "product-description" | "checklist" | "country-research" | "quotation-draft"
   >("opportunities");
@@ -104,6 +106,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
           quantity: quantity.trim(),
           businessType: businessType.trim(),
           subTool: toolToRun,
+          language: languageInfo.code,
+          languageName: `${languageInfo.nativeName} (${languageInfo.name})`,
         }),
       });
 

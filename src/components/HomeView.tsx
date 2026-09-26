@@ -24,6 +24,7 @@ import {
 import { ActiveTab, SavedItem, AssistantResult } from "../types";
 import { QUICK_PROMPTS } from "../data/mockData";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface HomeViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -31,18 +32,8 @@ interface HomeViewProps {
   savedItemIds: string[];
 }
 
-const ASSISTANT_TOPICS = [
-  { id: "all", label: "All Topics" },
-  { id: "seo", label: "🔍 SEO" },
-  { id: "social", label: "📱 Social Media" },
-  { id: "export", label: "🌐 Export & Trade" },
-  { id: "business", label: "💼 Business & Margins" },
-  { id: "marketing", label: "📣 Marketing & Growth" },
-  { id: "branding", label: "✨ Branding & USP" },
-  { id: "outreach", label: "💬 Buyer Outreach" },
-];
-
 export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) => {
+  const { t, language, languageInfo, isRtl } = useLanguage();
   const [query, setQuery] = useState("");
   const [selectedTopic, setSelectedTopic] = useState("all");
   const [isLoading, setIsLoading] = useState(false);
@@ -53,10 +44,21 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [hasSaved, setHasSaved] = useState(false);
 
+  const assistantTopics = [
+    { id: "all", label: t("home.topicAll", "All Topics") },
+    { id: "seo", label: t("home.topicSeo", "🔍 SEO") },
+    { id: "social", label: t("home.topicSocial", "📱 Social Media") },
+    { id: "export", label: t("home.topicExport", "🌐 Export & Trade") },
+    { id: "business", label: t("home.topicBusiness", "💼 Business & Margins") },
+    { id: "marketing", label: t("home.topicMarketing", "📣 Growth Marketing") },
+    { id: "branding", label: t("home.topicBranding", "✨ Brand & USP") },
+    { id: "outreach", label: t("home.topicOutreach", "💬 Buyer Outreach") },
+  ];
+
   const handleAskAI = async (textToAsk?: string, categoryOverride?: string) => {
     const promptToUse = textToAsk || query;
     if (!promptToUse.trim()) {
-      setErrorMessage("Please enter a business, SEO, export, or marketing inquiry.");
+      setErrorMessage(t("errors.emptyQuery", "Please enter a business, SEO, export, or marketing inquiry."));
       return;
     }
 
@@ -81,7 +83,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
         },
         body: JSON.stringify({ 
           query: promptToUse.trim(),
-          category: topicToUse !== "all" ? topicToUse : "General Business Growth & Export Strategy"
+          category: topicToUse !== "all" ? topicToUse : "General Business Growth & Export Strategy",
+          language: languageInfo.code,
+          languageName: `${languageInfo.nativeName} (${languageInfo.name})`,
         }),
         signal: controller.signal,
       });
@@ -158,19 +162,19 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       <section className="text-center pt-3 pb-2 space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-medium backdrop-blur-md">
           <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Next-Gen Global Trade & Business Suite</span>
+          <span>{t("home.heroBadge", "AI-Powered Global Commerce & Growth Engine")}</span>
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white uppercase drop-shadow-sm">
-          BUSINESS GROWTH & EXPORT HUB
+          {t("home.heroTitle", "BUSINESS GROWTH & EXPORT HUB")}
         </h1>
         
         <p className="text-sm sm:text-base text-cyan-200/90 font-medium">
-          “Turn your business idea into growth.”
+          {t("home.heroSubtitle", "Turn your business idea into growth.")}
         </p>
         
         <p className="text-xs text-slate-400 max-w-md mx-auto">
-          Grow Your Business • Reach Customers • Go Global
+          {t("header.brandSubtitle", "Grow Your Business • Reach Customers • Go Global")}
         </p>
       </section>
 
@@ -187,7 +191,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             </div>
             <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 transition-colors" />
           </div>
-          <span className="font-bold text-sm text-white block">🔍 SEO</span>
+          <span className="font-bold text-sm text-white block">🔍 {t("nav.seo", "SEO")}</span>
           <span className="text-[11px] text-slate-400 block mt-0.5">Audits & Keywords</span>
         </button>
 
@@ -202,7 +206,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             </div>
             <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors" />
           </div>
-          <span className="font-bold text-sm text-white block">📱 SOCIAL</span>
+          <span className="font-bold text-sm text-white block">📱 {t("nav.social", "SOCIAL")}</span>
           <span className="text-[11px] text-slate-400 block mt-0.5">Reels, Posts & Plans</span>
         </button>
 
@@ -217,7 +221,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             </div>
             <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 transition-colors" />
           </div>
-          <span className="font-bold text-sm text-white block">🌍 EXPORT</span>
+          <span className="font-bold text-sm text-white block">🌍 {t("nav.export", "EXPORT")}</span>
           <span className="text-[11px] text-slate-400 block mt-0.5">Buyers & Checklists</span>
         </button>
 
@@ -232,7 +236,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             </div>
             <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
           </div>
-          <span className="font-bold text-sm text-white block">💼 BUSINESS</span>
+          <span className="font-bold text-sm text-white block">💼 {t("nav.business", "BUSINESS")}</span>
           <span className="text-[11px] text-slate-400 block mt-0.5">Plans, Margins & Brand</span>
         </button>
       </section>
@@ -243,21 +247,21 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
             <h2 className="font-bold text-sm sm:text-base text-white">
-              Ask AI anything about your business
+              {t("home.askButton", "Ask AI anything about your business")}
             </h2>
           </div>
           <span className="text-[10px] uppercase font-semibold tracking-wider text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-full border border-cyan-800/60">
-            Trade Intelligence
+            {languageInfo.nativeName} ({language.toUpperCase()})
           </span>
         </div>
 
         <p className="text-xs text-slate-300 mb-2.5">
-          Select a topic or type anything about SEO, social media, export, or business growth:
+          {t("home.heroSubtitle", "Select a topic or type anything about SEO, social media, export, or business growth:")}
         </p>
 
         {/* Focus Topic Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 scrollbar-none">
-          {ASSISTANT_TOPICS.map((topic) => (
+          {assistantTopics.map((topic) => (
             <button
               key={topic.id}
               onClick={() => setSelectedTopic(topic.id)}
@@ -284,7 +288,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
                 handleAskAI();
               }
             }}
-            placeholder="e.g., How do I start exporting home decor to the US and Europe with low MOQ?"
+            placeholder={t("home.inputPlaceholder", "e.g., How do I start exporting home decor to the US and Europe with low MOQ?")}
             className="w-full rounded-xl bg-slate-950/80 border border-slate-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 text-white placeholder-slate-500 p-3.5 text-xs sm:text-sm resize-none outline-none transition-all"
           />
 
@@ -301,11 +305,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                  <span>Synthesizing Strategy...</span>
+                  <span>{t("home.asking", "Synthesizing Strategy...")}</span>
                 </>
               ) : (
                 <>
-                  <span>Consult Advisor</span>
+                  <span>{t("home.askButton", "Consult Advisor")}</span>
                   <CornerDownLeft className="w-3.5 h-3.5" />
                 </>
               )}

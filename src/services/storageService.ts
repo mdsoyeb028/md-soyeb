@@ -7,7 +7,8 @@ import {
   query, 
   orderBy, 
   serverTimestamp,
-  getDocs
+  getDocs,
+  getDocFromServer
 } from "firebase/firestore";
 import { 
   User, 
@@ -53,6 +54,35 @@ export async function signInWithGoogle(): Promise<User> {
     console.error("Sign in error:", err);
     throw err;
   }
+}
+
+export async function updateUserLanguagePreference(userId: string, languageCode: string): Promise<void> {
+  if (!userId || !languageCode) return;
+  try {
+    const userRef = doc(db, "users", userId);
+    await setDoc(userRef, {
+      preferredLanguage: languageCode,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.error("Failed to update user language in Firestore:", err);
+  }
+}
+
+export async function getUserLanguagePreference(userId: string): Promise<string | null> {
+  if (!userId) return null;
+  try {
+    const userRef = doc(db, "users", userId);
+    const snap = await getDocFromServer(userRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return (data?.preferredLanguage as string) || null;
+    }
+  } catch (err) {
+    // Non-blocking error if offline or permissions issue
+    console.warn("Could not fetch remote user language preference:", err);
+  }
+  return null;
 }
 
 export async function logOutUser(): Promise<void> {

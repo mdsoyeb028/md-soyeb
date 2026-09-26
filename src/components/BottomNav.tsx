@@ -1,6 +1,7 @@
 import React from "react";
 import { Home, Search, Smartphone, Globe2, Briefcase } from "lucide-react";
 import { ActiveTab } from "../types";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface BottomNavProps {
   activeTab: ActiveTab;
@@ -8,12 +9,14 @@ interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
+  const { t } = useLanguage();
+
   const tabs = [
-    { id: "home" as const, label: "Home", icon: Home },
-    { id: "seo" as const, label: "SEO", icon: Search },
-    { id: "social" as const, label: "Social", icon: Smartphone },
-    { id: "export" as const, label: "Export", icon: Globe2 },
-    { id: "business" as const, label: "Business", icon: Briefcase },
+    { id: "home" as const, label: t("nav.home", "Home"), icon: Home },
+    { id: "seo" as const, label: t("nav.seo", "SEO"), icon: Search },
+    { id: "social" as const, label: t("nav.social", "Social"), icon: Smartphone },
+    { id: "export" as const, label: t("nav.export", "Export"), icon: Globe2 },
+    { id: "business" as const, label: t("nav.business", "Business"), icon: Briefcase },
   ];
 
   return (

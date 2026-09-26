@@ -178,7 +178,7 @@ function getProviderSourceName(provider: "gemini" | "groq" | "openrouter"): stri
 app.post("/api/ai/assistant", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   try {
-    const { query, category, context, conversationHistory } = req.body || {};
+    const { query, category, context, conversationHistory, language, languageName } = req.body || {};
     if (!query || typeof query !== "string" || !query.trim()) {
       res.status(400).json({ 
         success: false, 
@@ -198,6 +198,7 @@ app.post("/api/ai/assistant", async (req, res) => {
     const trimmedQuery = query.trim();
     const domainContext = category && typeof category === "string" ? category.trim() : "General Business Growth & Export Strategy";
     const extraContext = context && typeof context === "string" ? context.trim() : "";
+    const selectedLanguage = languageName || language || "English";
     const historyText = Array.isArray(conversationHistory) 
       ? conversationHistory.map((m: { role?: string; content?: string }) => `${m.role || "user"}: ${m.content || ""}`).join("\n")
       : "";
@@ -217,10 +218,19 @@ SPECIALIZATIONS YOU COVER:
 USER INQUIRY:
 "${trimmedQuery}"
 
+TARGET OUTPUT LANGUAGE:
+"${selectedLanguage}"
+
 ADDITIONAL USER CONTEXT:
 Category: ${domainContext}
 Context: ${extraContext || "Not provided"}
 ${historyText ? `Recent Conversation History:\n${historyText}` : ""}
+
+CRITICAL LANGUAGE INSTRUCTIONS:
+1. Respond in the user's selected language: ${selectedLanguage}. All generated explanations, actions, plans, and guidance MUST be written in ${selectedLanguage}.
+2. If the user inquiry is in another language, understand it and respond in ${selectedLanguage} (or in the query language if no explicit preference is set).
+3. Do NOT translate: URLs, API keys, email addresses, technical code, technical identifiers, or website domains.
+4. Preserve proper technical terms, brand names, company names, product names, and proper nouns when appropriate.
 
 CRITICAL INTEGRITY & ACCURACY RULES:
 1. Do NOT invent fake customers, fake buyers, fake company names, fake phone numbers, fake email addresses, or fake order numbers.
@@ -547,6 +557,8 @@ app.post("/api/ai/export", async (req, res) => {
       budget,
       quantity,
       businessType,
+      language,
+      languageName,
     } = req.body || {};
 
     if (!productName || typeof productName !== "string" || !productName.trim()) {
@@ -571,6 +583,7 @@ app.post("/api/ai/export", async (req, res) => {
     const selectedTarget = targetCountry && typeof targetCountry === "string" && targetCountry.trim() ? targetCountry.trim() : "International Market";
     const selectedBuyerType = buyerType && typeof buyerType === "string" && buyerType.trim() ? buyerType.trim() : "B2B Wholesalers, Distributors & Importers";
     const selectedSize = businessSize || businessType || "Small to Medium Exporter";
+    const selectedLanguage = languageName || language || "English";
     const selectedQuestion = specificQuestion && typeof specificQuestion === "string" && specificQuestion.trim() ? specificQuestion.trim() : "";
     const selectedSubTool = subTool && typeof subTool === "string" ? subTool.trim() : "opportunities";
 
@@ -586,6 +599,11 @@ TRADE PARAMETERS:
 - Specific User Question / Inquiries: "${selectedQuestion || "Complete export feasibility, compliance, Incoterms, and buyer outreach strategy."}"
 - Sub-Tool Requested: "${selectedSubTool}"
 - Budget / Quantity Context: "${budget || "Commercial scale"} / ${quantity || "Standard export batches"}"
+- Target Output Language: "${selectedLanguage}"
+
+CRITICAL LANGUAGE INSTRUCTIONS:
+1. Respond in the user's selected language: ${selectedLanguage}. All generated analyses, checklists, drafts, and advice MUST be in ${selectedLanguage}.
+2. Do NOT translate: URLs, official trade codes (like HS codes, Incoterms abbreviations like FOB, CIF), emails, or domain names unless requested.
 
 CRITICAL ACCURACY & COMPLIANCE RULES:
 1. Do NOT invent or fabricate official regulations, import licenses, exact tariff duty percentages, mandatory HS codes, buyers, companies, phone numbers, email addresses, or market statistics.
@@ -675,7 +693,7 @@ Respond with strictly valid JSON according to this exact JSON schema:
 app.post("/api/ai/business", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   try {
-    const { toolType, inputData } = req.body || {};
+    const { toolType, inputData, language, languageName } = req.body || {};
 
     if (!toolType || typeof toolType !== "string") {
       res.status(400).json({ 
@@ -685,9 +703,16 @@ app.post("/api/ai/business", async (req, res) => {
       return;
     }
 
+    const selectedLanguage = languageName || language || "English";
+
     const prompt = `You are a senior commercial strategist and business growth advisor.
 Tool Requested: ${toolType}
 Input Data: ${JSON.stringify(inputData || {})}
+Target Output Language: ${selectedLanguage}
+
+CRITICAL LANGUAGE INSTRUCTIONS:
+1. Respond in the user's selected language: ${selectedLanguage}. All business advice, calculations explanations, steps, and deliverables MUST be in ${selectedLanguage}.
+2. Preserve proper technical terms, brand names, URLs, formulas, and currencies where appropriate.
 
 Provide a structured, highly actionable business deliverable in clear markdown format.
 Be rigorous, realistic, and commercially sound. Do not invent fake statistics or guaranteed financial outcomes.`;

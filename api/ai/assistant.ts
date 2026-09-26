@@ -31,7 +31,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const body = await parseRequestBody(req);
-    const { query, category, context, conversationHistory } = body || {};
+    const { query, category, context, conversationHistory, language, languageName } = body || {};
 
     if (!query || typeof query !== "string" || !query.trim()) {
       sendJsonResponse(res, 400, {
@@ -53,6 +53,7 @@ export default async function handler(req: any, res: any) {
     const domainContext =
       category && typeof category === "string" ? category.trim() : "General Business Growth & Export Strategy";
     const extraContext = context && typeof context === "string" ? context.trim() : "";
+    const selectedLanguage = languageName || language || "English";
     const historyText = Array.isArray(conversationHistory)
       ? conversationHistory.map((m: { role?: string; content?: string }) => `${m.role || "user"}: ${m.content || ""}`).join("\n")
       : "";
@@ -72,10 +73,19 @@ SPECIALIZATIONS YOU COVER:
 USER INQUIRY:
 "${trimmedQuery}"
 
+TARGET OUTPUT LANGUAGE:
+"${selectedLanguage}"
+
 ADDITIONAL USER CONTEXT:
 Category: ${domainContext}
 Context: ${extraContext || "Not provided"}
 ${historyText ? `Recent Conversation History:\n${historyText}` : ""}
+
+CRITICAL LANGUAGE INSTRUCTIONS:
+1. Respond in the user's selected language: ${selectedLanguage}. All generated explanations, actions, plans, and guidance MUST be written in ${selectedLanguage}.
+2. If the user inquiry is in another language, understand it and respond in ${selectedLanguage} (or in the query language if no explicit preference is set).
+3. Do NOT translate: URLs, API keys, email addresses, technical code, technical identifiers, or website domains.
+4. Preserve proper technical terms, brand names, company names, product names, and proper nouns when appropriate.
 
 CRITICAL INTEGRITY & ACCURACY RULES:
 1. Do NOT invent fake customers, fake buyers, fake company names, fake phone numbers, fake email addresses, or fake order numbers.
