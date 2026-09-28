@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { User } from "firebase/auth";
 import { ActiveTab, SavedItem } from "./types";
 import { 
@@ -15,14 +15,16 @@ import { BackgroundElements } from "./components/BackgroundElements";
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import { HomeView } from "./components/HomeView";
-import { SeoView } from "./components/SeoView";
-import { SocialView } from "./components/SocialView";
-import { ExportView } from "./components/ExportView";
-import { BusinessView } from "./components/BusinessView";
-import { DashboardView } from "./components/DashboardView";
-import { PricingView } from "./components/PricingView";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { LanguageProvider } from "./i18n/LanguageContext";
+
+// Code splitting & lazy loading heavy secondary views to optimize initial bundle size
+const SeoView = lazy(() => import("./components/SeoView").then(m => ({ default: m.SeoView })));
+const SocialView = lazy(() => import("./components/SocialView").then(m => ({ default: m.SocialView })));
+const ExportView = lazy(() => import("./components/ExportView").then(m => ({ default: m.ExportView })));
+const BusinessView = lazy(() => import("./components/BusinessView").then(m => ({ default: m.BusinessView })));
+const DashboardView = lazy(() => import("./components/DashboardView").then(m => ({ default: m.DashboardView })));
+const PricingView = lazy(() => import("./components/PricingView").then(m => ({ default: m.PricingView })));
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
@@ -176,38 +178,45 @@ export default function App() {
               />
             )}
 
-            {activeTab === "seo" && (
-              <SeoView onSaveItem={handleSaveItem} />
-            )}
+            <Suspense fallback={
+              <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
+                <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                <span className="text-xs">Loading growth tools...</span>
+              </div>
+            }>
+              {activeTab === "seo" && (
+                <SeoView onSaveItem={handleSaveItem} />
+              )}
 
-            {activeTab === "social" && (
-              <SocialView onSaveItem={handleSaveItem} />
-            )}
+              {activeTab === "social" && (
+                <SocialView onSaveItem={handleSaveItem} />
+              )}
 
-            {activeTab === "export" && (
-              <ExportView onSaveItem={handleSaveItem} />
-            )}
+              {activeTab === "export" && (
+                <ExportView onSaveItem={handleSaveItem} />
+              )}
 
-            {activeTab === "business" && (
-              <BusinessView onSaveItem={handleSaveItem} />
-            )}
+              {activeTab === "business" && (
+                <BusinessView onSaveItem={handleSaveItem} />
+              )}
 
-            {activeTab === "dashboard" && (
-              <DashboardView
-                savedItems={savedItems}
-                user={user}
-                isLoading={isReportsLoading}
-                error={reportsError}
-                onDeleteItem={handleDeleteItem}
-                onSignIn={handleSignIn}
-                onSignOut={handleSignOut}
-                setActiveTab={setActiveTab}
-              />
-            )}
+              {activeTab === "dashboard" && (
+                <DashboardView
+                  savedItems={savedItems}
+                  user={user}
+                  isLoading={isReportsLoading}
+                  error={reportsError}
+                  onDeleteItem={handleDeleteItem}
+                  onSignIn={handleSignIn}
+                  onSignOut={handleSignOut}
+                  setActiveTab={setActiveTab}
+                />
+              )}
 
-            {activeTab === "pricing" && (
-              <PricingView />
-            )}
+              {activeTab === "pricing" && (
+                <PricingView />
+              )}
+            </Suspense>
           </main>
 
           {/* Global Toast Notification */}

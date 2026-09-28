@@ -107,233 +107,319 @@ Use this real observed content to provide realistic OLD vs NEW headline, CTA, an
 
     const isDoItForMe = Boolean(doItForMe || trimmedQuery.toLowerCase().includes("create everything") || trimmedQuery.toLowerCase().includes("solve my problem"));
 
-    const prompt = `You are the executive intelligence of the "Business Growth Center & Self-Solving Engine".
+    const prompt = `You are an expert business growth coach and diagnostic specialist for small businesses, freelancers, local shops, manufacturers, and exporters (especially from Bangladesh, India, and similar markets).
 
-PRIMARY MANDATE:
-ACTUALLY SOLVE the user's business problem. DO NOT return a list of links, articles, generic advice, "go read this website", or "research this yourself".
-Perform the solution inside the app by generating the ACTUAL READY-TO-USE MATERIALS that the user can immediately copy, send, publish, or use.
+Your job is to take the user's business problem and return a complete, practical Solution Pack. Never give vague or motivational advice. Be direct, specific, and actionable.
 
-SELF-SOLVING WORKFLOW:
-PROBLEM → DIAGNOSIS → SOLUTION → READY-TO-USE MATERIAL → ACTION → MEASUREMENT
-
-USER INQUIRY / BUSINESS PROBLEM:
+USER BUSINESS PROBLEM / INQUIRY:
 "${trimmedQuery}"
-
-MODE:
-${isDoItForMe ? "⚡ 'CREATE EVERYTHING FOR ME' MODE ACTIVATED: Generate complete ready-to-use materials, copy, scripts, and prioritized checklist." : "STANDARD PROBLEM-SOLVING MODE"}
 
 TARGET OUTPUT LANGUAGE:
 "${selectedLanguage}"
 
-ADDITIONAL USER CONTEXT:
-Category: ${domainContext}
-Context: ${extraContext || "Not provided"}
-${crawledWebsiteSummary}
-${historyText ? `Recent Conversation History:\n${historyText}` : ""}
+CRITICAL RULES:
+1. Always respond in the same language the user used (English, Bangla, Hindi, or mixed Hinglish/Banglish). Keep business terms natural and crisp.
+2. Diagnosis must be honest and specific. Point out the real bottleneck (e.g. lack of trust, confusing offer, zero outreach, weak pricing, bad CTA).
+3. Every material must be ready to copy-paste (headlines, WhatsApp messages, emails, offers, CTAs, FAQs).
+4. 7-Day Plan must have exact daily tasks (not "work on marketing").
+5. Include expected realistic outcome if they follow the plan (e.g., "Expected 3-5 qualified buyer conversations in 7 days").
+6. If a website URL is provided, use the crawl data below to make the diagnosis accurate and ground headlines/CTAs on actual observed content.
+7. Keep language simple and practical. Prefer short sentences and bullet points.
+8. Do NOT invent fake revenues, fake customers, or fake guarantees.
 
-PROBLEM-SOLVING SCENARIO GUIDELINES:
-1. Sales Problem ("My sales are low" / drop in revenue):
-   - Analyze: Offer, target customer, pricing, positioning, visibility, lead generation, conversion, sales process, follow-up, retention, competition.
-   - Generate: Sales improvement plan, offer improvement, customer segment, value proposition, ready-to-copy sales message, WhatsApp message, email message, follow-up sequence, phone call script, objection responses, CTA, 7-day and 30-day action plans.
-2. No Customers ("I don't have customers" / zero traction):
-   - Generate: Target customer definition, customer problem, offer, acquisition channels, outreach strategy, organic content strategy, referral strategy, partnership ideas, lead collection method, ready-to-copy outreach messages, ready-to-copy follow-up messages, weekly activity target.
-3. Website Not Converting / Website Provided:
-   - Format: CURRENT PROBLEM → WHY IT MAY HURT CONVERSION → WHAT TO CHANGE → REPLACEMENT COPY.
-   - Include OLD vs NEW headline and OLD vs NEW CTA.
-   - Generate: Homepage structure, service section, trust section, FAQ, CTA, contact/enquiry messaging, lead form questions, 7-day plan.
-4. SEO Problem:
-   - Generate: Title replacement, meta description, H1 suggestion, H2 structure, content outline, keyword placement, image alt-text guidance, technical fix checklist.
-5. Social Media Stagnant:
-   - Generate: Target audience, content pillars, 30-day content calendar, post ideas, viral hooks, ready-to-post captions, CTAs, short-video scripts, carousel ideas.
-6. Local Business:
-   - Generate: Local positioning, business description, service descriptions, Google Business Profile content, genuine customer review request message, review response templates, local visibility plan.
-7. Low-Budget Business ("I have no money for marketing"):
-   - Activate LOW-BUDGET MODE: Prioritize FREE -> LOW-COST -> PAID. 7-day execution plan.
-8. Competitor Problem:
-   - Generate: Observable competitor differences, user's current gaps, positioning opportunities, offer differentiation, "How to compete" actions.
-9. General Growth Plan:
-   - Generate: Clear, specific roadmap for TODAY, 7 DAYS, 30 DAYS, 60 DAYS, 90 DAYS.
+${crawledWebsiteSummary ? `\n${crawledWebsiteSummary}\n` : ""}
+${historyText ? `Recent Conversation History:\n${historyText}\n` : ""}
 
-CRITICAL INTEGRITY & LANGUAGE RULES:
-1. All generated text, messages, scripts, headlines, and plans MUST be written in ${selectedLanguage}.
-2. DO NOT provide external links or tell the user to go read an external website.
-3. Every solution MUST include the "readyMaterials" array containing ready-to-use materials with a clear instruction: "I prepared everything. You only need to copy and paste/send it."
-4. Every solution MUST include a "nextAction" object specifying the single immediate next action the user should take right now, along with the exact text to copy and where to paste it.
-5. Every solution MUST include a "diagnosis" object breaking down likely bottlenecks, confirmed findings, assumptions, and the priority fix.
-6. DO NOT invent fake customers, fake orders, fake guarantees, or promise guaranteed 100 sales / #1 rankings. Use responsible commercial phrasing: "This action is intended to improve...", "Measure results by...".
-7. Technical strings, URLs, and emails remain untranslated.
-
-Respond strictly in valid JSON matching this schema:
+Respond strictly in valid JSON matching this exact schema:
 {
-  "answer": "Direct, executive-level diagnosis and solution explanation.",
-  "problemType": "sales" | "no_customers" | "website" | "seo" | "social" | "local" | "low_budget" | "competitor" | "growth",
-  "isLowBudgetMode": boolean,
   "diagnosis": {
-    "summary": "Clear executive summary of the business diagnosis",
-    "likelyBottlenecks": ["Bottleneck 1", "Bottleneck 2", "Bottleneck 3"],
-    "confirmedFindings": ["Observed finding 1", "Observed finding 2"],
-    "assumptions": ["Assumption requiring user confirmation 1"],
-    "priorityFix": "The single highest-priority problem to fix first"
+    "main_problem": "One clear sentence diagnosing the core bottleneck",
+    "root_causes": ["Specific root cause 1", "Specific root cause 2", "Specific root cause 3"],
+    "severity": "High",
+    "summary": "2-3 sentence honest, direct diagnosis"
   },
-  "readyMaterials": [
-    {
-      "id": "mat-1",
-      "category": "headline_cta" | "website_copy" | "whatsapp_message" | "email_sequence" | "sales_script" | "objection_handling" | "google_business" | "social_content" | "faq" | "offer_positioning",
-      "title": "Title of Material (e.g., High-Converting Homepage Headline & CTA)",
-      "description": "What this material does and where to apply it",
-      "content": "Exact copyable text ready to paste and use immediately",
-      "oldVsNew": {
-        "oldText": "Observed or typical weak copy",
-        "newText": "Improved replacement copy",
-        "reason": "Why this improves conversion"
+  "ready_materials": {
+    "headline_options": [
+      "High-converting headline option 1",
+      "High-converting headline option 2",
+      "High-converting headline option 3"
+    ],
+    "whatsapp_scripts": [
+      "Ready WhatsApp message script 1 (ready to copy and send)",
+      "Ready WhatsApp follow-up script 2"
+    ],
+    "email_or_dm_scripts": [
+      "Ready cold outreach or DM script (ready to copy and send)"
+    ],
+    "offer_or_pricing": "Clear, compelling offer structure or pricing guidance",
+    "cta_examples": [
+      "High-converting CTA 1",
+      "High-converting CTA 2"
+    ],
+    "faqs": [
+      {
+        "question": "Realistic customer objection or question 1",
+        "answer": "Clear, reassuring answer"
       },
-      "instructions": "I prepared everything. You only need to copy and paste/send it."
-    }
-  ],
-  "nextAction": {
-    "title": "Immediate Next Action",
-    "actionText": "Replace your homepage headline with the improved version",
-    "materialToCopy": "Exact text to copy for this action",
-    "whereToUse": "Homepage hero section",
-    "stepIndex": 1
+      {
+        "question": "Realistic customer objection or question 2",
+        "answer": "Clear, reassuring answer"
+      }
+    ]
   },
-  "implementationSteps": [
+  "seven_day_plan": [
     {
-      "id": "step-1",
-      "stepNumber": 1,
-      "timeframe": "TODAY" | "DAY 1-2" | "WEEK 1" | "30 DAYS",
-      "title": "Step 1 title",
-      "action": "Exact step instruction",
-      "readyMaterialSnippet": "Snippet of prepared copy",
-      "completed": false
+      "day": 1,
+      "title": "Immediate Headline & CTA Fix",
+      "tasks": [
+        "Replace hero headline with generated option 1",
+        "Add direct WhatsApp order/inquiry CTA button"
+      ],
+      "time_required": "30-45 mins"
+    },
+    {
+      "day": 2,
+      "title": "Offer & Pricing Clarity",
+      "tasks": [
+        "Update product/service descriptions with the new offer structure",
+        "Add trust badges or verified guarantees"
+      ],
+      "time_required": "45 mins"
+    },
+    {
+      "day": 3,
+      "title": "Targeted Outbound Outreach",
+      "tasks": [
+        "Identify 15 ideal prospects in target location",
+        "Send personalized WhatsApp / Email script 1"
+      ],
+      "time_required": "60 mins"
+    },
+    {
+      "day": 4,
+      "title": "Organic Content / Proof Publishing",
+      "tasks": [
+        "Publish behind-the-scenes or client proof post",
+        "Share customer review / satisfaction highlight"
+      ],
+      "time_required": "30 mins"
+    },
+    {
+      "day": 5,
+      "title": "Past Client & Warm Inquiries Follow-Up",
+      "tasks": [
+        "Send WhatsApp script 2 to inquiries from past 30 days",
+        "Activate referral offer for 5 past happy clients"
+      ],
+      "time_required": "45 mins"
+    },
+    {
+      "day": 6,
+      "title": "Local SEO / Profile Optimization",
+      "tasks": [
+        "Update Google Business Profile or social bio with new keywords",
+        "Add updated price sheet / catalog link"
+      ],
+      "time_required": "30 mins"
+    },
+    {
+      "day": 7,
+      "title": "Review Inquiries & Next Activity Target",
+      "tasks": [
+        "Count total replies and qualified conversations",
+        "Calibrate outreach list for the upcoming week"
+      ],
+      "time_required": "30 mins"
     }
   ],
-  "sevenDayPlan": [
-    {
-      "day": "Day 1",
-      "focus": "Immediate Conversion / Value Fix",
-      "action": "Replace homepage headline and primary CTA with high-converting versions",
-      "materialSnippet": "Snippet of prepared copy to deploy"
-    },
-    {
-      "day": "Day 2",
-      "focus": "Positioning & Trust Building",
-      "action": "Deploy trust section and core value proposition",
-      "materialSnippet": "Prepared value prop"
-    },
-    {
-      "day": "Day 3",
-      "focus": "Direct Buyer Outreach",
-      "action": "Send 15 personalized outreach messages to ideal target customers",
-      "materialSnippet": "Ready WhatsApp/Email template"
-    },
-    {
-      "day": "Day 4",
-      "focus": "Objection Handling & Follow-up",
-      "action": "Follow up with prospects using prepared sequence and answer common objections",
-      "materialSnippet": "Ready follow-up message"
-    },
-    {
-      "day": "Day 5",
-      "focus": "Organic Visibility & GBP/Social",
-      "action": "Publish high-converting social carousel or Google Business update",
-      "materialSnippet": "Ready social/GBP post"
-    },
-    {
-      "day": "Day 6",
-      "focus": "Referral & Partnership Activation",
-      "action": "Reach out to past clients or strategic partners with referral offer",
-      "materialSnippet": "Ready referral script"
-    },
-    {
-      "day": "Day 7",
-      "focus": "Measurement & Pipeline Review",
-      "action": "Review conversion clicks, outreach replies, and calibrate next week's activity target",
-      "materialSnippet": "Activity target metrics"
-    }
-  ],
-  "actionPlan": {
-    "today": ["Action today"],
-    "next7Days": ["Action 1 for week 1", "Action 2 for week 1"],
-    "next30Days": ["Action for month 1"],
-    "next60Days": ["Action for month 2"],
-    "next90Days": ["Action for month 3"]
+  "growth_roadmap": {
+    "day_30": "What should be achieved in 30 days",
+    "day_60": "What should be achieved in 60 days",
+    "day_90": "What should be achieved in 90 days"
   },
-  "actions": ["Primary action 1", "Primary action 2", "Primary action 3"],
-  "stepByStepPlan": ["Plan step 1", "Plan step 2", "Plan step 3", "Plan step 4"],
-  "importantConsiderations": ["Key risk or factor 1", "Key factor 2"],
-  "nextSteps": ["Next step 1", "Next step 2"],
-  "verificationNotice": "Strategic advice and generated materials are ready-to-use business solutions. Official compliance, licensing, tariffs and legal requirements require verification with relevant official authorities."
+  "expected_outcome": "Realistic result if they follow the 7-day plan (e.g. 3-8 qualified buyer conversations and reduced inquiry drop-off)",
+  "next_action": "The single most important thing they should do right now (e.g. Copy Headline 1 and update your homepage/bio)"
 }`;
 
     const { text, provider } = await generateAICompletion(prompt, { jsonMode: true });
     const parsed = safeParseJson<any>(text);
 
-    // Build comprehensive markdown content for exports and backwards compatibility
-    const markdownSections: string[] = [
-      `### 🔍 Diagnosis & Strategic Solution\n${parsed.answer || ""}`,
-    ];
+    // Normalize SolutionPack structure
+    const solutionPack = {
+      diagnosis: parsed.diagnosis || {
+        main_problem: parsed.answer || "Identified conversion and growth bottleneck",
+        root_causes: ["Unclear offer", "Low conversion CTA", "Insufficient outreach"],
+        severity: "High",
+        summary: parsed.answer || "Business growth diagnosis completed.",
+      },
+      ready_materials: parsed.ready_materials || {
+        headline_options: ["High-Converting Business Headline"],
+        whatsapp_scripts: ["Hi, thank you for reaching out..."],
+        email_or_dm_scripts: ["Hi, I noticed your business..."],
+        offer_or_pricing: "Clear commercial offer",
+        cta_examples: ["Inquire on WhatsApp", "Get Instant Quote"],
+        faqs: [{ question: "How does this work?", answer: "Direct service delivery." }],
+      },
+      seven_day_plan: Array.isArray(parsed.seven_day_plan) ? parsed.seven_day_plan : [
+        { day: 1, title: "Headline Fix", tasks: ["Update headline"], time_required: "30 mins" },
+        { day: 2, title: "Offer Update", tasks: ["Clarify offer"], time_required: "30 mins" },
+        { day: 3, title: "Direct Outreach", tasks: ["Send 15 messages"], time_required: "45 mins" },
+        { day: 4, title: "Follow-up", tasks: ["Follow up with prospects"], time_required: "30 mins" },
+        { day: 5, title: "Social Update", tasks: ["Post case study"], time_required: "30 mins" },
+        { day: 6, title: "Referral Push", tasks: ["Ask 5 past clients"], time_required: "30 mins" },
+        { day: 7, title: "Review & Measure", tasks: ["Count qualified leads"], time_required: "30 mins" }
+      ],
+      growth_roadmap: parsed.growth_roadmap || {
+        day_30: "Consistent inbound inquiries established",
+        day_60: "Repeat orders and referral engine active",
+        day_90: "Scaling to new geographic regions or product categories",
+      },
+      expected_outcome: parsed.expected_outcome || "Realistic 3-8 qualified buyer conversations within 7-14 days.",
+      next_action: parsed.next_action || "Deploy the updated headline and direct WhatsApp CTA immediately.",
+      website_data: websiteCrawlData,
+    };
 
-    if (parsed.diagnosis?.priorityFix) {
-      markdownSections.push(`\n\n### ⚡ Priority Fix (Fix This First)\n**${parsed.diagnosis.priorityFix}**`);
+    // Flatten into readyMaterials array for backwards compatibility
+    const readyMaterialsList: any[] = [];
+    if (solutionPack.ready_materials?.headline_options?.length) {
+      readyMaterialsList.push({
+        id: "mat-headlines",
+        category: "headline_cta",
+        title: "High-Converting Headlines",
+        description: "Choose one of these tested headlines for your homepage hero or social bio",
+        content: solutionPack.ready_materials.headline_options.map((h: string, i: number) => `Option ${i + 1}: ${h}`).join("\n\n"),
+        instructions: "I prepared everything. You only need to copy and paste it into your hero section.",
+      });
     }
-
-    if (parsed.nextAction?.actionText) {
-      markdownSections.push(`\n\n### 🚀 Your Immediate Next Action\n**${parsed.nextAction.title}**: ${parsed.nextAction.actionText}\n${parsed.nextAction.materialToCopy ? `\n\`\`\`text\n${parsed.nextAction.materialToCopy}\n\`\`\`` : ""}`);
+    if (solutionPack.ready_materials?.whatsapp_scripts?.length) {
+      readyMaterialsList.push({
+        id: "mat-whatsapp",
+        category: "whatsapp_message",
+        title: "WhatsApp Inbound & Follow-Up Scripts",
+        description: "Ready-to-send messages for incoming leads and warm prospect follow-ups",
+        content: solutionPack.ready_materials.whatsapp_scripts.join("\n\n---\n\n"),
+        instructions: "I prepared everything. You only need to copy and send it on WhatsApp.",
+      });
     }
-
-    if (Array.isArray(parsed.readyMaterials) && parsed.readyMaterials.length > 0) {
-      markdownSections.push(`\n\n### 📦 Ready-to-Use Materials (Copy & Use Directly)\n*I prepared everything. You only need to copy, publish, or send it.*`);
-      parsed.readyMaterials.forEach((m: any) => {
-        markdownSections.push(`\n#### ${m.title} (${m.category || "Asset"})\n${m.description || ""}\n\n\`\`\`text\n${m.content || ""}\n\`\`\``);
+    if (solutionPack.ready_materials?.email_or_dm_scripts?.length) {
+      readyMaterialsList.push({
+        id: "mat-email",
+        category: "email_sequence",
+        title: "Cold Outreach / DM Script",
+        description: "Personalized outbound pitch for potential clients or B2B buyers",
+        content: solutionPack.ready_materials.email_or_dm_scripts.join("\n\n---\n\n"),
+        instructions: "I prepared everything. You only need to copy and send.",
+      });
+    }
+    if (solutionPack.ready_materials?.offer_or_pricing) {
+      readyMaterialsList.push({
+        id: "mat-offer",
+        category: "offer_positioning",
+        title: "Offer & Value Proposition",
+        description: "Clear customer-centric offer structure and pricing framing",
+        content: solutionPack.ready_materials.offer_or_pricing,
+        instructions: "I prepared everything. Use this on your services page or quote sheet.",
+      });
+    }
+    if (solutionPack.ready_materials?.cta_examples?.length) {
+      readyMaterialsList.push({
+        id: "mat-cta",
+        category: "headline_cta",
+        title: "Call-to-Action (CTA) Buttons",
+        description: "High-intent CTA copy for buttons and banners",
+        content: solutionPack.ready_materials.cta_examples.join("  |  "),
+        instructions: "I prepared everything. Replace generic 'Submit' buttons with these.",
+      });
+    }
+    if (solutionPack.ready_materials?.faqs?.length) {
+      readyMaterialsList.push({
+        id: "mat-faq",
+        category: "faq",
+        title: "Objection-Busting FAQs",
+        description: "Answers to top buyer hesitations to remove friction before purchase",
+        content: solutionPack.ready_materials.faqs.map((f: any) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n"),
+        instructions: "I prepared everything. Paste this into your FAQ or sales conversations.",
       });
     }
 
-    if (Array.isArray(parsed.actions) && parsed.actions.length > 0) {
-      markdownSections.push(`\n\n### 🎯 Recommended Strategic Actions\n${parsed.actions.map((a: string) => `* ${a}`).join("\n")}`);
-    }
+    // Build comprehensive markdown content for exports
+    const markdownContent = `### 🔍 Diagnosis: ${solutionPack.diagnosis.main_problem}
+**Severity:** ${solutionPack.diagnosis.severity}
+${solutionPack.diagnosis.summary}
 
-    if (Array.isArray(parsed.sevenDayPlan) && parsed.sevenDayPlan.length > 0) {
-      markdownSections.push(`\n\n### 📅 7-Day Action Plan\n${parsed.sevenDayPlan.map((d: any) => `* **${d.day} (${d.focus})**: ${d.action}${d.materialSnippet ? ` \n  *Asset:* \`${d.materialSnippet}\`` : ""}`).join("\n")}`);
-    }
+**Root Causes:**
+${solutionPack.diagnosis.root_causes.map((c: string) => `* ${c}`).join("\n")}
 
-    if (Array.isArray(parsed.stepByStepPlan) && parsed.stepByStepPlan.length > 0) {
-      markdownSections.push(`\n\n### 🗺️ Step-by-Step Execution Plan\n${parsed.stepByStepPlan.map((s: string, idx: number) => `${idx + 1}. ${s}`).join("\n")}`);
-    }
+### 🚀 Immediate Next Action
+${solutionPack.next_action}
 
-    if (Array.isArray(parsed.importantConsiderations) && parsed.importantConsiderations.length > 0) {
-      markdownSections.push(`\n\n### ⚠️ Critical Considerations & Risk Controls\n${parsed.importantConsiderations.map((c: string) => `* ${c}`).join("\n")}`);
-    }
+### 📦 Ready-to-Use Materials
+${readyMaterialsList.map((m: any) => `#### ${m.title}\n\`\`\`text\n${m.content}\n\`\`\``).join("\n\n")}
 
-    markdownSections.push(`\n\n> **Notice:** ${parsed.verificationNotice || "Strategic advice and generated materials are ready-to-use business solutions. Official compliance, licensing, tariffs and legal requirements require verification with relevant official authorities."}`);
+### 📅 7-Day Action Plan
+${solutionPack.seven_day_plan.map((d: any) => `* **Day ${d.day}: ${d.title}** (${d.time_required})\n  ${d.tasks.map((t: string) => `  - ${t}`).join("\n")}`).join("\n")}
 
-    const markdownContent = markdownSections.join("");
+### 📈 30/60/90-Day Growth Roadmap
+* **Day 30:** ${solutionPack.growth_roadmap.day_30}
+* **Day 60:** ${solutionPack.growth_roadmap.day_60}
+* **Day 90:** ${solutionPack.growth_roadmap.day_90}
+
+### 🎯 Expected Realistic Outcome
+${solutionPack.expected_outcome}`;
+
     const sourceName = getProviderSourceName(provider);
 
     sendJsonResponse(res, 200, {
       success: true,
       data: {
-        answer: parsed.answer || "Problem diagnosed and solution materials generated.",
-        problemType: parsed.problemType || "general",
-        isLowBudgetMode: Boolean(parsed.isLowBudgetMode),
-        diagnosis: parsed.diagnosis || {
-          summary: parsed.answer || "Business diagnostic completed.",
-          likelyBottlenecks: parsed.actions || [],
-          confirmedFindings: [],
+        solutionPack,
+        answer: solutionPack.diagnosis.summary,
+        problemType: "solution_pack",
+        isLowBudgetMode: true,
+        diagnosis: {
+          summary: solutionPack.diagnosis.summary,
+          likelyBottlenecks: solutionPack.diagnosis.root_causes,
+          confirmedFindings: [solutionPack.diagnosis.main_problem],
           assumptions: [],
-          priorityFix: parsed.actions?.[0] || "Execute initial tactical step.",
+          priorityFix: solutionPack.next_action,
         },
-        readyMaterials: Array.isArray(parsed.readyMaterials) ? parsed.readyMaterials : [],
-        nextAction: parsed.nextAction || null,
-        implementationSteps: Array.isArray(parsed.implementationSteps) ? parsed.implementationSteps : [],
-        sevenDayPlan: Array.isArray(parsed.sevenDayPlan) ? parsed.sevenDayPlan : [],
-        actionPlan: parsed.actionPlan || null,
+        readyMaterials: readyMaterialsList,
+        nextAction: {
+          title: "Immediate Next Action",
+          actionText: solutionPack.next_action,
+          materialToCopy: solutionPack.ready_materials?.headline_options?.[0] || solutionPack.ready_materials?.whatsapp_scripts?.[0] || solutionPack.next_action,
+          whereToUse: "Website hero section / WhatsApp bio",
+          stepIndex: 1,
+        },
+        implementationSteps: solutionPack.seven_day_plan.map((d: any) => ({
+          id: `step-${d.day}`,
+          stepNumber: d.day,
+          timeframe: `Day ${d.day}`,
+          title: d.title,
+          action: d.tasks.join("; "),
+          readyMaterialSnippet: d.time_required,
+          completed: false,
+        })),
+        sevenDayPlan: solutionPack.seven_day_plan.map((d: any) => ({
+          day: `Day ${d.day}`,
+          focus: d.title,
+          action: d.tasks.join("; "),
+          materialSnippet: d.time_required,
+          completed: false,
+        })),
+        actionPlan: {
+          today: [solutionPack.next_action],
+          next7Days: solutionPack.seven_day_plan.map((d: any) => `Day ${d.day}: ${d.title}`),
+          next30Days: [solutionPack.growth_roadmap.day_30],
+          next60Days: [solutionPack.growth_roadmap.day_60],
+          next90Days: [solutionPack.growth_roadmap.day_90],
+        },
         websiteCrawlData,
-        actions: Array.isArray(parsed.actions) ? parsed.actions : [],
-        stepByStepPlan: Array.isArray(parsed.stepByStepPlan) ? parsed.stepByStepPlan : [],
-        importantConsiderations: Array.isArray(parsed.importantConsiderations) ? parsed.importantConsiderations : [],
-        nextSteps: Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [],
-        verificationNotice: parsed.verificationNotice || "Needs verification with the relevant official authority.",
+        actions: solutionPack.seven_day_plan.map((d: any) => `Day ${d.day}: ${d.title} - ${d.tasks[0] || ""}`),
+        stepByStepPlan: solutionPack.seven_day_plan.map((d: any) => `${d.title} (${d.time_required})`),
+        importantConsiderations: solutionPack.diagnosis.root_causes,
+        nextSteps: [solutionPack.next_action, solutionPack.expected_outcome],
+        verificationNotice: "Guidance is tailored commercial strategy. Official regulatory compliance, export licensing, and taxes require verification with relevant authorities.",
         content: markdownContent,
         source: sourceName,
       },

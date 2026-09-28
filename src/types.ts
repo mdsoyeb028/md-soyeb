@@ -538,6 +538,52 @@ export interface AssistantResult {
   problemType?: string;
 }
 
+export interface SolutionPackDiagnosis {
+  main_problem: string;
+  root_causes: string[];
+  severity: "High" | "Medium" | "Low";
+  summary: string;
+}
+
+export interface SolutionPackMaterials {
+  headline_options: string[];
+  whatsapp_scripts: string[];
+  email_or_dm_scripts: string[];
+  offer_or_pricing: string;
+  cta_examples: string[];
+  faqs: Array<{ question: string; answer: string }>;
+}
+
+export interface SolutionPackDayPlan {
+  day: number;
+  title: string;
+  tasks: string[];
+  time_required: string;
+  completed?: boolean;
+}
+
+export interface SolutionPackRoadmap {
+  day_30: string;
+  day_60: string;
+  day_90: string;
+}
+
+export interface SolutionPack {
+  diagnosis: SolutionPackDiagnosis;
+  ready_materials: SolutionPackMaterials;
+  seven_day_plan: SolutionPackDayPlan[];
+  growth_roadmap: SolutionPackRoadmap;
+  expected_outcome: string;
+  next_action: string;
+  website_data?: {
+    url: string;
+    detectedTitle?: string;
+    detectedH1?: string[];
+    score?: number;
+    observableIssues?: string[];
+  };
+}
+
 export interface PricingPlan {
   id: string;
   name: string;
