@@ -17,7 +17,7 @@ import {
   AlertCircle,
   RefreshCw
 } from "lucide-react";
-import { SavedItem } from "../types";
+import { SavedItem, ActiveTab } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -25,9 +25,10 @@ import { AILanguageSelector } from "./AILanguageSelector";
 
 interface BusinessViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
+  setActiveTab?: (tab: ActiveTab) => void;
 }
 
-export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
+export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiveTab }) => {
   const { t, languageInfo } = useLanguage();
   const [selectedToolId, setSelectedToolId] = useState("pricing-calc");
 
@@ -170,16 +171,30 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
     <div className="space-y-5 pb-6">
       {/* Banner */}
       <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900/80 to-blue-950/60 border border-emerald-500/30 backdrop-blur-xl">
-        <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-1">
-          <Briefcase className="w-4 h-4" />
-          <span>Business Planning & Operations Suite</span>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-1">
+              <Briefcase className="w-4 h-4" />
+              <span>Business Planning & Operations Suite</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-white">
+              Business Growth Tools
+            </h1>
+            <p className="text-xs text-slate-300 mt-1">
+              9 specialized commercial calculators, marketing plan creators, and strategic messaging generators.
+            </p>
+          </div>
+
+          {setActiveTab && (
+            <button
+              onClick={() => setActiveTab("home")}
+              className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Open Growth Operating System →</span>
+            </button>
+          )}
         </div>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-white">
-          Business Growth Tools
-        </h1>
-        <p className="text-xs text-slate-300 mt-1">
-          9 specialized commercial calculators, marketing plan creators, and strategic messaging generators for startups and exporters.
-        </p>
       </div>
 
       {/* Tool Selector Carousel / Horizontal Scroll */}

@@ -233,18 +233,24 @@ export interface BusinessProfile {
   country?: string;
   city?: string;
   targetArea?: string;
+  serviceArea?: string;
   website?: string;
   googleBusinessUrl?: string;
   socialLinks?: {
     instagram?: string;
     facebook?: string;
     youtube?: string;
+    linkedin?: string;
     other?: string;
   };
+  products?: string;
+  services?: string;
   productsServices?: string;
   priceRange?: string;
+  targetCustomer?: string;
   targetCustomers?: string;
   currentCustomerSource?: string;
+  marketingBudget?: string;
   monthlyMarketingBudget?: string;
   currentMetrics?: {
     monthlySales?: string;
@@ -597,6 +603,7 @@ export interface PracticalProblemSolverResult {
   action_plan: Array<{
     day: number;
     task: string;
+    time_required?: string;
     completed?: boolean;
   }>;
   expected_result: string;
@@ -608,6 +615,81 @@ export interface PracticalProblemSolverResult {
     score?: number;
     observableIssues?: string[];
   };
+  // Comprehensive Business Growth Operating System engines:
+  root_cause_diagnosis?: {
+    primary_problem: string;
+    secondary_problems?: string[];
+    evidence?: string[];
+    possible_causes?: string[];
+    confirmed_facts?: string[];
+    assumptions?: string[];
+    missing_information?: string[];
+    fix_this_first?: string;
+  };
+  website_analysis?: {
+    what_found?: string;
+    why_it_matters?: string;
+    what_to_change?: string;
+    exact_replacement?: {
+      current_headline?: string;
+      recommended_headline: string;
+      current_cta?: string;
+      recommended_cta: string;
+    };
+    homepage_copy?: string;
+    service_copy?: string;
+    cta?: string;
+    faq?: Array<{ question: string; answer: string }>;
+    lead_form?: string[];
+    whatsapp_cta?: string;
+    landing_page_structure?: string[];
+  };
+  customer_acquisition?: {
+    summary: string;
+    free_organic_channels?: Array<{ channel: string; how_to_execute: string; target_reach: string }>;
+    low_cost_channels?: Array<{ channel: string; how_to_execute: string; target_reach: string }>;
+    paid_channels?: Array<{ channel: string; how_to_execute: string; budget_needed: string }>;
+    hundred_prospects_plan?: {
+      target_profile: { industry: string; location: string; core_need: string };
+      channels: Array<{ channel: string; activity_target: number; qualification_criteria: string; action_method: string }>;
+      outreach_script: string;
+    };
+  };
+  sales_strategy?: {
+    sales_pitch?: string;
+    phone_script?: string;
+    whatsapp_sales_script?: string;
+    email_sales_script?: string;
+    objection_handling?: Array<{ objection: string; response: string }>;
+    closing_questions?: string[];
+    follow_up_sequence?: Array<{ timing: string; channel: string; subject_or_hook: string; message_copy: string; cta: string }>;
+  };
+  ads_strategy?: {
+    recommended_platform?: string;
+    campaign_objective?: string;
+    target_audience?: { demographics: string; location: string; interests_or_keywords: string[]; negative_keywords: string[] };
+    budget_plan?: { daily_budget: string; bidding_strategy: string };
+    ad_copy?: { headlines: string[]; descriptions: string[]; cta: string };
+    landing_page_advice?: string;
+    creative_direction?: { image_brief: string; video_script?: { hook: string; body: string; cta: string } };
+    tracking_guidance?: string;
+  };
+  organic_local_strategy?: {
+    gbp_plan?: {
+      category_suggestions: string[];
+      description: string;
+      photo_checklist: string[];
+      weekly_post_ideas: string[];
+      review_request_template: string;
+      review_response_templates: { positive: string; critical: string };
+    };
+    referral_system?: { offer: string; request_script: string; incentive_model: string };
+    content_calendar?: Array<{ day: number; format: string; topic: string; hook: string; caption: string; cta: string }>;
+  };
+  action_center?: Array<{ timeframe: string; action: string; why: string; how: string; tool: string; cost_category: string; expected_metric: string }>;
+  growth_roadmap?: { day_30: string; day_60: string; day_90: string };
+  tracking_and_metrics?: Array<{ metric: string; target_baseline: string; how_to_measure: string }>;
+  optimization_guidance?: { keep: string[]; change: string[]; pause: string[]; test: string[]; improve: string[]; next_experiment: string };
 }
 
 export interface PricingPlan {

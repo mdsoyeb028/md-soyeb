@@ -197,7 +197,7 @@ export default function App() {
               )}
 
               {activeTab === "business" && (
-                <BusinessView onSaveItem={handleSaveItem} />
+                <BusinessView onSaveItem={handleSaveItem} setActiveTab={setActiveTab} />
               )}
 
               {activeTab === "dashboard" && (
