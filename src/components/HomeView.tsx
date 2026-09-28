@@ -26,7 +26,7 @@ import {
   Smartphone,
   Briefcase
 } from "lucide-react";
-import { ActiveTab, SavedItem, SolutionPack } from "../types";
+import { ActiveTab, SavedItem, SolutionPack, PracticalProblemSolverResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -88,6 +88,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
   const [loadingStep, setLoadingStep] = useState(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [solutionPack, setSolutionPack] = useState<SolutionPack | null>(null);
+  const [practicalResult, setPracticalResult] = useState<PracticalProblemSolverResult | null>(null);
   
   // Interactive Tracker & Copy state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -125,6 +126,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
     setIsLoading(true);
     setErrorMessage(null);
     setSolutionPack(null);
+    setPracticalResult(null);
     setHasSavedToVault(false);
     setCompletedDays({});
     setLoadingStep(1);
@@ -169,35 +171,62 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       }
 
       const payload = data.data || data;
+
+      const practical: PracticalProblemSolverResult | null = payload.practicalResult || (payload.solutionPack ? {
+        understood: payload.solutionPack.diagnosis?.summary || "Understood your business problem.",
+        real_problem: payload.solutionPack.diagnosis?.main_problem || "Friction in customer acquisition and conversion.",
+        immediate_action: payload.solutionPack.next_action || "Deploy the new headline and send the ready outreach script.",
+        ready_materials: {
+          main_script: payload.solutionPack.ready_materials?.whatsapp_scripts?.[0] || "Hi, thank you for reaching out...",
+          headline_or_offer: payload.solutionPack.ready_materials?.headline_options?.[0] || payload.solutionPack.ready_materials?.offer_or_pricing || "High-converting commercial offer",
+          cta: payload.solutionPack.ready_materials?.cta_examples?.[0] || "Chat on WhatsApp",
+          extra_material: payload.solutionPack.ready_materials?.email_or_dm_scripts?.[0] || "Follow-up message template",
+        },
+        action_plan: payload.solutionPack.seven_day_plan?.map((d: any) => ({
+          day: d.day,
+          task: d.tasks?.[0] || d.title,
+        })) || [],
+        expected_result: payload.solutionPack.expected_outcome || "Realistic buyer conversations within 5-7 days.",
+        next_one_thing: payload.solutionPack.next_action || "Deploy the ready outreach script today.",
+        website_data: payload.solutionPack.website_data,
+      } : null);
+
+      setPracticalResult(practical);
+
       const pack: SolutionPack = payload.solutionPack || {
         diagnosis: {
-          main_problem: payload.answer || "Bottleneck identified",
-          root_causes: payload.diagnosis?.likelyBottlenecks || ["Conversion friction", "Unclear offer"],
+          main_problem: practical?.real_problem || payload.answer || "Bottleneck identified",
+          root_causes: [practical?.real_problem || "Conversion friction"],
           severity: "High",
-          summary: payload.diagnosis?.summary || payload.answer || "Diagnosis completed.",
+          summary: practical?.understood || payload.diagnosis?.summary || payload.answer || "Diagnosis completed.",
         },
         ready_materials: {
-          headline_options: payload.readyMaterials?.filter((m: any) => m.category === "headline_cta").map((m: any) => m.content) || ["High-Converting Business Headline"],
-          whatsapp_scripts: payload.readyMaterials?.filter((m: any) => m.category === "whatsapp_message").map((m: any) => m.content) || ["Hi, thank you for reaching out..."],
-          email_or_dm_scripts: payload.readyMaterials?.filter((m: any) => m.category === "email_sequence").map((m: any) => m.content) || ["Hi, I noticed your business..."],
-          offer_or_pricing: payload.readyMaterials?.find((m: any) => m.category === "offer_positioning")?.content || "Clear commercial value offer",
-          cta_examples: ["Chat on WhatsApp", "Get Instant Quote"],
+          headline_options: practical?.ready_materials?.headline_or_offer ? [practical.ready_materials.headline_or_offer] : (payload.readyMaterials?.filter((m: any) => m.category === "headline_cta").map((m: any) => m.content) || ["High-Converting Business Headline"]),
+          whatsapp_scripts: practical?.ready_materials?.main_script ? [practical.ready_materials.main_script] : (payload.readyMaterials?.filter((m: any) => m.category === "whatsapp_message").map((m: any) => m.content) || ["Hi, thank you for reaching out..."]),
+          email_or_dm_scripts: practical?.ready_materials?.extra_material ? [practical.ready_materials.extra_material] : (payload.readyMaterials?.filter((m: any) => m.category === "email_sequence").map((m: any) => m.content) || ["Hi, I noticed your business..."]),
+          offer_or_pricing: practical?.ready_materials?.headline_or_offer || payload.readyMaterials?.find((m: any) => m.category === "offer_positioning")?.content || "Clear commercial value offer",
+          cta_examples: practical?.ready_materials?.cta ? [practical.ready_materials.cta] : ["Chat on WhatsApp", "Get Instant Quote"],
           faqs: payload.readyMaterials?.filter((m: any) => m.category === "faq").map((m: any) => ({ question: m.title, answer: m.content })) || [],
         },
-        seven_day_plan: payload.sevenDayPlan?.map((d: any, idx: number) => ({
+        seven_day_plan: practical?.action_plan ? practical.action_plan.map((d: any) => ({
+          day: d.day,
+          title: d.task.slice(0, 30),
+          tasks: [d.task],
+          time_required: "30-45 mins",
+        })) : (payload.sevenDayPlan?.map((d: any, idx: number) => ({
           day: idx + 1,
           title: d.focus || `Day ${idx + 1} Action`,
           tasks: [d.action],
           time_required: d.materialSnippet || "30-45 mins",
-        })) || [],
+        })) || []),
         growth_roadmap: {
           day_30: payload.actionPlan?.next30Days?.[0] || "Consistent inbound inquiries established",
           day_60: payload.actionPlan?.next60Days?.[0] || "Repeat buyer relationships and referral engine running",
           day_90: payload.actionPlan?.next90Days?.[0] || "Scaling sales to new channels or territories",
         },
-        expected_outcome: payload.nextSteps?.[1] || "3-8 qualified buyer conversations within 7-14 days.",
-        next_action: payload.nextAction?.actionText || "Deploy the new headline and direct WhatsApp CTA immediately.",
-        website_data: payload.websiteCrawlData,
+        expected_outcome: practical?.expected_result || payload.nextSteps?.[1] || "3-8 qualified buyer conversations within 7-14 days.",
+        next_action: practical?.next_one_thing || practical?.immediate_action || payload.nextAction?.actionText || "Deploy the new headline and direct WhatsApp CTA immediately.",
+        website_data: practical?.website_data || payload.websiteCrawlData,
       };
 
       setSolutionPack(pack);
@@ -210,8 +239,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       onSaveItem({
         type: "assistant",
         title: `Solution Pack: ${reportTitle}`,
-        summary: `Problem: ${pack.diagnosis.main_problem}. Next Action: ${pack.next_action}`,
-        content: payload.content || JSON.stringify(pack),
+        summary: `Problem: ${practical?.real_problem || pack.diagnosis.main_problem}. Next Action: ${practical?.next_one_thing || pack.next_action}`,
+        content: payload.content || JSON.stringify({ practicalResult: practical, solutionPack: pack }),
         category: "Solution Pack",
         tags: ["Problem Solver", "7-Day Plan", "Ready Materials"],
         context: `Query: ${queryToUse} ${urlToUse ? `| Website: ${urlToUse}` : ""}`,
@@ -239,9 +268,15 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
     }
   };
 
+  const activePlan = solutionPack?.seven_day_plan || practicalResult?.action_plan?.map((d) => ({
+    day: d.day,
+    title: d.task.slice(0, 30),
+    tasks: [d.task],
+    time_required: "30-45 mins",
+  })) || [];
   const completedCount = Object.values(completedDays).filter(Boolean).length;
-  const totalDays = solutionPack?.seven_day_plan.length || 7;
-  const progressPercent = Math.round((completedCount / totalDays) * 100);
+  const totalDays = activePlan.length || 7;
+  const progressPercent = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
 
   return (
     <div className="space-y-6 pb-12">
@@ -413,16 +448,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       </section>
 
       {/* ============================================================== */}
-      {/* 3. DYNAMIC SOLUTION PACK OUTPUT                                */}
+      {/* 3. DYNAMIC PRACTICAL SOLUTION & EXECUTION PACK OUTPUT          */}
       {/* ============================================================== */}
-      {solutionPack && (
+      {(practicalResult || solutionPack) && (
         <section id="solution-pack-output" className="space-y-5 animate-in fade-in duration-300">
           {/* Top Sticky Bar: Immediate Next Action & Vault Status */}
           <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-cyan-950 via-slate-900 to-indigo-950 border-2 border-cyan-500/60 shadow-2xl space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-cyan-800/40">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-cyan-400 text-slate-950 text-[10px] font-black uppercase tracking-wider">
-                  START HERE • NEXT ACTION
+                  START HERE • NEXT ONE THING TODAY
                 </span>
                 <span className="text-xs text-slate-300">The single most important step right now:</span>
               </div>
@@ -439,7 +474,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             </div>
 
             <p className="text-xs sm:text-sm font-bold text-white leading-relaxed">
-              {solutionPack.next_action}
+              {practicalResult?.next_one_thing || solutionPack?.next_action}
             </p>
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
@@ -449,7 +484,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
               
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleCopy(solutionPack.next_action, "next-action-copy")}
+                  onClick={() => handleCopy(practicalResult?.next_one_thing || solutionPack?.next_action || "", "next-action-copy")}
                   className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-700/60 font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   {copiedKey === "next-action-copy" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -474,63 +509,77 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
-                <h2 className="text-sm font-bold text-white">1. Honest Root-Cause Diagnosis</h2>
+                <h2 className="text-sm font-bold text-white">1. Problem Diagnosis & Bottlenecks</h2>
               </div>
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                solutionPack.diagnosis.severity === "High"
+                (solutionPack?.diagnosis.severity === "High" || !solutionPack)
                   ? "bg-rose-950 text-rose-300 border border-rose-800/60"
                   : "bg-amber-950 text-amber-300 border border-amber-800/60"
               }`}>
-                Severity: {solutionPack.diagnosis.severity}
+                Severity: {solutionPack?.diagnosis.severity || "High"}
               </span>
             </div>
 
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
-              <span className="text-[11px] font-mono text-cyan-400 uppercase font-semibold block">
-                Primary Bottleneck Identified:
-              </span>
-              <p className="text-xs sm:text-sm font-semibold text-white">
-                {solutionPack.diagnosis.main_problem}
-              </p>
-              <p className="text-xs text-slate-300 leading-relaxed pt-1">
-                {solutionPack.diagnosis.summary}
-              </p>
-            </div>
-
-            {/* Root Causes List */}
-            {solutionPack.diagnosis.root_causes?.length > 0 && (
-              <div className="space-y-1.5 pt-1">
-                <span className="text-[11px] font-semibold text-slate-400 block">
-                  Contributing Root Causes:
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                  {solutionPack.diagnosis.root_causes.map((cause, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-2">
-                      <span className="w-4 h-4 rounded-full bg-slate-800 text-cyan-300 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                        {idx + 1}
-                      </span>
-                      <span className="text-slate-300 text-[11px]">{cause}</span>
-                    </div>
-                  ))}
+            {/* Understood banner */}
+            {practicalResult?.understood && (
+              <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs text-cyan-200 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-cyan-300 block">Understood:</span>
+                  <span>{practicalResult.understood}</span>
                 </div>
               </div>
             )}
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold block">
+                  ⚠️ What Is Actually Wrong (Real Problem)
+                </span>
+                <p className="text-white font-medium leading-relaxed">
+                  {practicalResult?.real_problem || solutionPack?.diagnosis.main_problem}
+                </p>
+                {solutionPack?.diagnosis.summary && (
+                  <p className="text-slate-400 text-[11px] leading-relaxed pt-1">
+                    {solutionPack.diagnosis.summary}
+                  </p>
+                )}
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-emerald-400 uppercase font-semibold block">
+                    ⚡ Immediate Action (Do Right Now)
+                  </span>
+                  <button
+                    onClick={() => handleCopy(practicalResult?.immediate_action || solutionPack?.next_action || "", "immediate-action-copy")}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold cursor-pointer"
+                  >
+                    {copiedKey === "immediate-action-copy" ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedKey === "immediate-action-copy" ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+                <p className="text-white font-medium leading-relaxed">
+                  {practicalResult?.immediate_action || solutionPack?.next_action}
+                </p>
+              </div>
+            </div>
+
             {/* Crawled Webpage Evidence if Available */}
-            {solutionPack.website_data && (
+            {(practicalResult?.website_data || solutionPack?.website_data) && (
               <div className="p-3 rounded-xl bg-slate-950/90 border border-cyan-500/30 text-xs space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-cyan-300 font-mono">
-                  <span>Crawled Webpage: {solutionPack.website_data.url}</span>
-                  <span>Health Score: {solutionPack.website_data.score || 0}/100</span>
+                  <span>Crawled Webpage: {(practicalResult?.website_data || solutionPack?.website_data)?.url}</span>
+                  <span>Health Score: {(practicalResult?.website_data || solutionPack?.website_data)?.score || 0}/100</span>
                 </div>
                 <div className="text-[11px] text-slate-300">
                   <strong className="text-white">Observed Title: </strong>
-                  <span>{solutionPack.website_data.detectedTitle || "None"}</span>
+                  <span>{(practicalResult?.website_data || solutionPack?.website_data)?.detectedTitle || "None"}</span>
                 </div>
-                {solutionPack.website_data.observableIssues && solutionPack.website_data.observableIssues.length > 0 && (
+                {(practicalResult?.website_data || solutionPack?.website_data)?.observableIssues && (practicalResult?.website_data || solutionPack?.website_data)!.observableIssues!.length > 0 && (
                   <div className="text-[11px] text-slate-400">
                     <strong className="text-amber-400">Conversion Leaks: </strong>
-                    <span>{solutionPack.website_data.observableIssues.join("; ")}</span>
+                    <span>{(practicalResult?.website_data || solutionPack?.website_data)!.observableIssues!.join("; ")}</span>
                   </div>
                 )}
               </div>
@@ -548,6 +597,99 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
                 1-click copy & paste directly into your site, WhatsApp, or messages
               </span>
             </div>
+
+            {/* Instant 4 Practical Materials Quick Cards */}
+            {practicalResult?.ready_materials && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {/* 1. Main WhatsApp / DM Script */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-emerald-400 uppercase font-semibold flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                      💬 Main WhatsApp / DM Script
+                    </span>
+                    <button
+                      onClick={() => handleCopy(practicalResult.ready_materials.main_script, "quick-wa")}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedKey === "quick-wa" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "quick-wa" ? "Copied" : "Copy Message"}</span>
+                    </button>
+                  </div>
+                  <pre className="text-slate-200 font-sans whitespace-pre-wrap leading-relaxed text-xs bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                    {practicalResult.ready_materials.main_script}
+                  </pre>
+                </div>
+
+                {/* 2. New Headline or Offer */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-cyan-500/30 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-cyan-400 uppercase font-semibold flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-cyan-400" />
+                      🏷️ New Headline or Offer
+                    </span>
+                    <button
+                      onClick={() => handleCopy(practicalResult.ready_materials.headline_or_offer, "quick-hl")}
+                      className="px-2.5 py-1 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedKey === "quick-hl" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "quick-hl" ? "Copied" : "Copy Offer"}</span>
+                    </button>
+                  </div>
+                  <pre className="text-slate-200 font-sans whitespace-pre-wrap leading-relaxed text-xs bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                    {practicalResult.ready_materials.headline_or_offer}
+                  </pre>
+                </div>
+
+                {/* 3. Call-to-Action (CTA) */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-blue-500/30 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-blue-400 uppercase font-semibold flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-blue-400" />
+                      🔘 Call-to-Action (CTA)
+                    </span>
+                    <button
+                      onClick={() => handleCopy(practicalResult.ready_materials.cta, "quick-cta")}
+                      className="px-2.5 py-1 rounded-lg bg-blue-950 hover:bg-blue-900 text-blue-300 border border-blue-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedKey === "quick-cta" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "quick-cta" ? "Copied" : "Copy CTA"}</span>
+                    </button>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                    <span className="text-white font-bold">"{practicalResult.ready_materials.cta}"</span>
+                    <span className="text-[10px] text-slate-400">High-intent conversion</span>
+                  </div>
+                </div>
+
+                {/* 4. Extra Material (Bio / Email / Caption) */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-purple-500/30 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-purple-400 uppercase font-semibold flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-purple-400" />
+                      ✉️ Extra Material (Bio / Follow-up / Email)
+                    </span>
+                    <button
+                      onClick={() => handleCopy(practicalResult.ready_materials.extra_material, "quick-extra")}
+                      className="px-2.5 py-1 rounded-lg bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedKey === "quick-extra" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === "quick-extra" ? "Copied" : "Copy Extra"}</span>
+                    </button>
+                  </div>
+                  <pre className="text-slate-200 font-sans whitespace-pre-wrap leading-relaxed text-xs bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
+                    {practicalResult.ready_materials.extra_material}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Extended Variations Tabs (if solutionPack has extra headlines/faqs) */}
+            {solutionPack && (
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                <span className="text-[11px] font-semibold text-slate-400 block">
+                  Extended Materials & Variations:
+                </span>
 
             {/* Material Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
@@ -747,6 +889,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
                 ))}
               </div>
             )}
+              </div>
+            )}
           </div>
 
           {/* Section 3: Exact 7-Day Action Plan */}
@@ -770,7 +914,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             </div>
 
             <div className="space-y-2.5 pt-1">
-              {solutionPack.seven_day_plan.map((dayItem) => {
+              {activePlan.map((dayItem) => {
                 const isChecked = Boolean(completedDays[dayItem.day]);
                 return (
                   <div
@@ -848,7 +992,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
                   Month 1 (30 Days)
                 </span>
                 <p className="text-slate-200 font-medium leading-relaxed">
-                  {solutionPack.growth_roadmap.day_30}
+                  {solutionPack?.growth_roadmap?.day_30 || "Consistent inbound inquiries established"}
                 </p>
               </div>
 
@@ -857,7 +1001,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
                   Month 2 (60 Days)
                 </span>
                 <p className="text-slate-200 font-medium leading-relaxed">
-                  {solutionPack.growth_roadmap.day_60}
+                  {solutionPack?.growth_roadmap?.day_60 || "Repeat buyer relationships and referral engine running"}
                 </p>
               </div>
 
@@ -866,7 +1010,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
                   Month 3 (90 Days)
                 </span>
                 <p className="text-slate-200 font-medium leading-relaxed">
-                  {solutionPack.growth_roadmap.day_90}
+                  {solutionPack?.growth_roadmap?.day_90 || "Scaling sales to new channels or territories"}
                 </p>
               </div>
             </div>
@@ -880,7 +1024,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             </div>
             
             <p className="text-xs sm:text-sm font-medium text-slate-100 leading-relaxed">
-              If you follow this 7-day plan: <strong className="text-emerald-300">{solutionPack.expected_outcome}</strong>
+              If you follow this 7-day plan: <strong className="text-emerald-300">{practicalResult?.expected_result || solutionPack?.expected_outcome || "3-8 qualified buyer conversations within 7-14 days."}</strong>
             </p>
             
             <p className="text-[11px] text-slate-400 pt-1">

@@ -584,6 +584,32 @@ export interface SolutionPack {
   };
 }
 
+export interface PracticalProblemSolverResult {
+  understood: string;
+  real_problem: string;
+  immediate_action: string;
+  ready_materials: {
+    main_script: string;
+    headline_or_offer: string;
+    cta: string;
+    extra_material: string;
+  };
+  action_plan: Array<{
+    day: number;
+    task: string;
+    completed?: boolean;
+  }>;
+  expected_result: string;
+  next_one_thing: string;
+  website_data?: {
+    url: string;
+    detectedTitle?: string;
+    detectedH1?: string[];
+    score?: number;
+    observableIssues?: string[];
+  };
+}
+
 export interface PricingPlan {
   id: string;
   name: string;
