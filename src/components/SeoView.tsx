@@ -21,6 +21,7 @@ import {
 import { SavedItem, SeoAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AILanguageSelector } from "./AILanguageSelector";
 
 interface SeoViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -160,6 +161,9 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
             className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 focus:border-cyan-400 text-white text-xs sm:text-sm outline-none"
           />
         </div>
+
+        {/* AI Response Language Selector */}
+        <AILanguageSelector label="Which language should I use for your AI response?" />
 
         <button
           id="analyze-seo-btn"

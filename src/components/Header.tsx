@@ -2,7 +2,6 @@ import React from "react";
 import { User } from "firebase/auth";
 import { Globe, Bookmark, Sparkles, LogIn } from "lucide-react";
 import { ActiveTab } from "../types";
-import { LanguageSelector } from "./LanguageSelector";
 import { useLanguage } from "../i18n/LanguageContext";
 
 interface HeaderProps {
@@ -85,9 +84,6 @@ export const Header: React.FC<HeaderProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
             <span>{t("header.plansBtn", "Plans")}</span>
           </button>
-
-          {/* Compact Worldwide Language Selector (Visible on both Desktop and Mobile) */}
-          <LanguageSelector />
 
           {/* Auth Button in Header */}
           {user ? (

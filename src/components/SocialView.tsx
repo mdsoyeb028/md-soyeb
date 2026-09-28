@@ -20,6 +20,7 @@ import {
 import { SavedItem, SocialMediaResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AILanguageSelector } from "./AILanguageSelector";
 
 interface SocialViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -222,15 +223,8 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
             />
           </div>
 
-          <div>
-            <label className="block text-slate-300 font-medium mb-1">Output Language</label>
-            <input
-              type="text"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              placeholder="e.g. English, Spanish, Arabic, French, German"
-              className="w-full rounded-xl bg-slate-950/80 border border-slate-700/80 focus:border-purple-400 p-2.5 text-white outline-none"
-            />
+          <div className="sm:col-span-2">
+            <AILanguageSelector label="Which language should I use for your AI response?" />
           </div>
 
           <div>

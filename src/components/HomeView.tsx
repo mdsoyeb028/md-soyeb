@@ -29,6 +29,7 @@ import {
 import { ActiveTab, SavedItem, SolutionPack, PracticalProblemSolverResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AILanguageSelector } from "./AILanguageSelector";
 
 interface HomeViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -302,14 +303,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       {/* 2. THE ONE INPUT BOX                                          */}
       {/* ============================================================== */}
       <section className="p-4 sm:p-6 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border border-cyan-500/40 shadow-2xl shadow-cyan-950/40 relative">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs">
+        <div className="space-y-3.5">
+          {/* AI Response Language Selection (inside the AI feature) */}
+          <AILanguageSelector label="Which language should I use for your AI response?" />
+
+          <div className="flex items-center justify-between text-xs pt-1">
             <label htmlFor="problem-input" className="font-bold text-slate-200 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
               Describe Your Business Problem
             </label>
             <span className="text-[11px] text-cyan-400 font-mono">
-              {languageInfo.nativeName} ({languageInfo.code.toUpperCase()})
+              Ready in {languageInfo.nativeName}
             </span>
           </div>
 

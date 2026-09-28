@@ -21,6 +21,7 @@ import { SavedItem } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AILanguageSelector } from "./AILanguageSelector";
 
 interface BusinessViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -337,6 +338,9 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem }) => {
             </div>
           </div>
         )}
+
+        {/* In-tool AI Response Language Selector */}
+        <AILanguageSelector label="Which language should I use for your AI response?" />
 
         <button
           id="run-business-tool-btn"

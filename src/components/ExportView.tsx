@@ -27,6 +27,7 @@ import {
 import { SavedItem, ExportAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { AILanguageSelector } from "./AILanguageSelector";
 
 interface ExportViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -380,6 +381,9 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
               />
             </div>
           </div>
+
+          {/* AI Response Language Selector */}
+          <AILanguageSelector label="Which language should I use for your AI response?" />
 
           <button
             id="find-export-opportunities-btn"

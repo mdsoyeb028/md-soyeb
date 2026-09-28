@@ -115,7 +115,6 @@ Rules:
 - Be direct and practical
 - Give ready-to-use materials that the user can copy-paste immediately
 - Prefer free or low-cost methods first
-- Speak in the same language the user used (English, Bangla, Hindi, or mixed Hinglish/Banglish)
 - Keep answers short, clear, and actionable
 
 USER BUSINESS PROBLEM / INQUIRY:
@@ -123,6 +122,12 @@ USER BUSINESS PROBLEM / INQUIRY:
 
 TARGET OUTPUT LANGUAGE:
 "${selectedLanguage}"
+
+CRITICAL LANGUAGE REQUIREMENT:
+The user has chosen "${selectedLanguage}" as their desired output language.
+You MUST write the entire JSON response (understood, real_problem, immediate_action, ready_materials scripts, headlines, offers, CTAs, extra_material, action_plan daily tasks, expected_result, next_one_thing) strictly in "${selectedLanguage}".
+Even if the user wrote their inquiry in another language (e.g., user wrote in English but selected Hindi, Bengali, Arabic, Spanish, French, German, etc.), your response MUST be in "${selectedLanguage}".
+Only keep brand names or web links in their original form.
 
 ${crawledWebsiteSummary ? `\n${crawledWebsiteSummary}\n` : ""}
 ${historyText ? `Recent Conversation History:\n${historyText}\n` : ""}
