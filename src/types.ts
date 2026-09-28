@@ -615,6 +615,19 @@ export interface PracticalProblemSolverResult {
     score?: number;
     observableIssues?: string[];
   };
+  // Real Research Layer
+  real_research?: {
+    live_research_status: "active" | "unavailable";
+    notice: string;
+    query_analyzed?: string;
+    sources: Array<{
+      source: string;
+      source_url: string;
+      what_was_found: string;
+      why_it_matters: string;
+      date_or_recency?: string;
+    }>;
+  };
   // Comprehensive Business Growth Operating System engines:
   root_cause_diagnosis?: {
     primary_problem: string;
@@ -623,13 +636,21 @@ export interface PracticalProblemSolverResult {
     possible_causes?: string[];
     confirmed_facts?: string[];
     assumptions?: string[];
+    hypothesis_or_suspected_issue?: string[];
     missing_information?: string[];
+    missing_data_needed_to_confirm?: string[];
     fix_this_first?: string;
   };
   website_analysis?: {
     what_found?: string;
     why_it_matters?: string;
     what_to_change?: string;
+    distinctions?: {
+      observed_facts: string[];
+      user_input: string[];
+      research_findings: string[];
+      inferences_and_hypotheses: string[];
+    };
     exact_replacement?: {
       current_headline?: string;
       recommended_headline: string;
@@ -646,12 +667,50 @@ export interface PracticalProblemSolverResult {
   };
   customer_acquisition?: {
     summary: string;
-    free_organic_channels?: Array<{ channel: string; how_to_execute: string; target_reach: string }>;
-    low_cost_channels?: Array<{ channel: string; how_to_execute: string; target_reach: string }>;
-    paid_channels?: Array<{ channel: string; how_to_execute: string; budget_needed: string }>;
+    evaluated_channels?: Array<{
+      channel: string;
+      why_it_fits: string;
+      cost_category: "FREE" | "LOW_COST" | "PAID";
+      difficulty: "Beginner" | "Intermediate" | "Advanced";
+      expected_workload: string;
+      how_to_start: string;
+      what_to_measure: string;
+      source_or_link?: string;
+    }>;
+    free_organic_channels?: Array<{ channel: string; how_to_execute: string; target_reach: string; what_to_measure?: string; cost_category?: string; difficulty?: string }>;
+    low_cost_channels?: Array<{ channel: string; how_to_execute: string; target_reach: string; what_to_measure?: string; cost_category?: string; difficulty?: string }>;
+    paid_channels?: Array<{ channel: string; how_to_execute: string; budget_needed: string; what_to_measure?: string; cost_category?: string; difficulty?: string }>;
     hundred_prospects_plan?: {
-      target_profile: { industry: string; location: string; core_need: string };
+      target_profile: { 
+        industry: string; 
+        location: string; 
+        core_need: string;
+        service?: string;
+        target_customer?: string;
+        customer_type?: string;
+      };
+      requested_count?: number;
+      verified_count?: number;
       channels: Array<{ channel: string; activity_target: number; qualification_criteria: string; action_method: string }>;
+      verified_prospects?: Array<{
+        business_name: string;
+        industry_or_category: string;
+        city_country: string;
+        website?: string;
+        public_business_url?: string;
+        public_contact_page_url?: string;
+        why_matches: string;
+        relevant_need_or_opportunity: string;
+        personalization_idea: string;
+        source: string;
+        verification_status: "Verified Public Business" | "Public Directory Record" | "Search Verified" | "Official Registry";
+      }>;
+      fallback_discovery?: {
+        exact_search_queries: string[];
+        directories_and_platforms: Array<{ name: string; url: string; how_to_use: string }>;
+        qualification_criteria: string[];
+        outreach_workflow: string;
+      };
       outreach_script: string;
     };
   };
@@ -667,25 +726,71 @@ export interface PracticalProblemSolverResult {
   ads_strategy?: {
     recommended_platform?: string;
     campaign_objective?: string;
+    campaign_structure?: {
+      campaign_name: string;
+      ad_groups: Array<{
+        name: string;
+        keyword_themes: string[];
+        negative_keywords: string[];
+        headlines: string[];
+        descriptions: string[];
+        cta: string;
+      }>;
+    };
     target_audience?: { demographics: string; location: string; interests_or_keywords: string[]; negative_keywords: string[] };
     budget_plan?: { daily_budget: string; bidding_strategy: string };
+    budget_scenarios?: {
+      low_budget_test: { daily_budget: string; test_duration: string; purpose: string };
+      standard_test: { daily_budget: string; test_duration: string; purpose: string };
+      higher_test: { daily_budget: string; test_duration: string; purpose: string };
+    };
     ad_copy?: { headlines: string[]; descriptions: string[]; cta: string };
     landing_page_advice?: string;
     creative_direction?: { image_brief: string; video_script?: { hook: string; body: string; cta: string } };
     tracking_guidance?: string;
+    safeguards_notice?: string;
+  };
+  meta_ads_strategy?: {
+    campaign_objective: string;
+    audience: string;
+    location: string;
+    creative_concept: string;
+    primary_text: string;
+    headline: string;
+    cta: string;
+    image_brief: string;
+    video_reel_script: {
+      hook: string;
+      body: string;
+      cta: string;
+    };
+    landing_page: string;
+    tracking_events: string[];
+    budget_test: {
+      low_budget_test: string;
+      standard_test: string;
+    };
   };
   organic_local_strategy?: {
     gbp_plan?: {
       category_suggestions: string[];
       description: string;
+      attributes_checklist?: string[];
       photo_checklist: string[];
       weekly_post_ideas: string[];
+      authentic_review_rules?: string[];
       review_request_template: string;
       review_response_templates: { positive: string; critical: string };
     };
     referral_system?: { offer: string; request_script: string; incentive_model: string };
     content_calendar?: Array<{ day: number; format: string; topic: string; hook: string; caption: string; cta: string }>;
   };
+  official_sources?: Array<{
+    title: string;
+    url: string;
+    category: string;
+    guidance: string;
+  }>;
   action_center?: Array<{ timeframe: string; action: string; why: string; how: string; tool: string; cost_category: string; expected_metric: string }>;
   growth_roadmap?: { day_30: string; day_60: string; day_90: string };
   tracking_and_metrics?: Array<{ metric: string; target_baseline: string; how_to_measure: string }>;
