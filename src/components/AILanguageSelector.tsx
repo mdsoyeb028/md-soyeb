@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Globe, ChevronDown, Search, Check, X, Sparkles } from "lucide-react";
+import { Globe, ChevronDown, Search, Check, X, Sparkles, Zap } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { LanguageInfo, LanguageRegion, WORLD_LANGUAGES } from "../i18n/languages";
+import { useCredits } from "../context/CreditsContext";
 
 // Quick-select primary language codes prominently displayed in the AI selector
 const PRIMARY_LANG_CODES = [
@@ -88,6 +89,15 @@ export const AILanguageSelector: React.FC<AILanguageSelectorProps> = ({
   className = "",
 }) => {
   const { language, languageInfo, setLanguage, supportedLanguages, isRtl } = useLanguage();
+  const { 
+    isAnonymous, 
+    consultationsUsed, 
+    plan, 
+    dailyLimit, 
+    creditsRemaining,
+    openSignupModal, 
+    openStatusModal 
+  } = useCredits();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("popular");
@@ -258,6 +268,36 @@ export const AILanguageSelector: React.FC<AILanguageSelectorProps> = ({
             <ChevronDown
               className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
             />
+          </button>
+
+          {/* Compact AI Credits Indicator */}
+          <button
+            type="button"
+            onClick={isAnonymous && consultationsUsed >= 1 ? openSignupModal : openStatusModal}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer shadow-sm active:scale-95 ${
+              isAnonymous
+                ? consultationsUsed === 0
+                  ? "bg-purple-950/80 border-purple-500/40 text-purple-300 hover:bg-purple-900/90"
+                  : "bg-rose-950/80 border-rose-500/40 text-rose-300 hover:bg-rose-900/90"
+                : plan === "pro"
+                ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/90"
+                : creditsRemaining === 0
+                ? "bg-rose-950/80 border-rose-500/40 text-rose-300 hover:bg-rose-900/90"
+                : "bg-purple-950/80 hover:bg-purple-900/90 border-purple-500/40 text-purple-300 hover:text-white"
+            }`}
+            title="Click to view AI Credits quota"
+          >
+            <Zap className={`w-3.5 h-3.5 shrink-0 ${
+              isAnonymous && consultationsUsed >= 1 ? "text-rose-400" : "text-cyan-400"
+            }`} />
+            <span className="font-mono">
+              {isAnonymous
+                ? (consultationsUsed === 0 ? "1 Free AI Test" : "Sign Up (Free)")
+                : dailyLimit === Infinity
+                ? "PRO • Unlimited"
+                : `AI Credits: ${creditsRemaining}/${dailyLimit} today`
+              }
+            </span>
           </button>
         </div>
       </div>

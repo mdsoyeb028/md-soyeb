@@ -21,6 +21,7 @@ import { SavedItem, ActiveTab } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
 
 interface BusinessViewProps {
@@ -30,6 +31,12 @@ interface BusinessViewProps {
 
 export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiveTab }) => {
   const { t, languageInfo } = useLanguage();
+  const { 
+    canPerformAIAction, 
+    consumeCredit, 
+    openSignupModal, 
+    openLimitModal 
+  } = useCredits();
   const [selectedToolId, setSelectedToolId] = useState("pricing-calc");
 
   // General form inputs
@@ -60,6 +67,19 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiv
   };
 
   const handleRunTool = async () => {
+    // If running an AI tool, enforce AI access & signup gate
+    if (selectedToolId !== "pricing-calc") {
+      const creditCheck = canPerformAIAction();
+      if (!creditCheck.allowed) {
+        if (creditCheck.reason === "need_signup") {
+          openSignupModal();
+        } else if (creditCheck.reason === "daily_limit_reached") {
+          openLimitModal();
+        }
+        return;
+      }
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
     setResultText(null);
@@ -121,6 +141,9 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiv
 
       const payload = data.data || data;
       setResultText(payload.content || data.content || "Business brief generated.");
+      if (selectedToolId !== "pricing-calc") {
+        await consumeCredit();
+      }
     } catch (err: unknown) {
       console.error("Business tool error:", err);
       const msg = normalizeErrorMessage(err, "Failed to generate business blueprint.");

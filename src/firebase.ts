@@ -3,6 +3,8 @@ import {
   getAuth, 
   GoogleAuthProvider, 
   signInWithPopup, 
+  signInAnonymously,
+  linkWithPopup,
   signOut,
   onAuthStateChanged,
   User 

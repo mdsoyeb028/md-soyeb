@@ -21,6 +21,7 @@ import {
 import { SavedItem, SeoAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
 
 interface SeoViewProps {
@@ -29,6 +30,12 @@ interface SeoViewProps {
 
 export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
   const { t, language, languageInfo } = useLanguage();
+  const { 
+    canPerformAIAction, 
+    consumeCredit, 
+    openSignupModal, 
+    openLimitModal 
+  } = useCredits();
   const [url, setUrl] = useState("https://md-soyeb.vercel.app");
   const [targetKeyword, setTargetKeyword] = useState("business growth export hub");
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +47,18 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
 
   const handleAnalyzeSeo = async () => {
     if (!url.trim() || isLoading) return;
+
+    // AI Access & Signup Gate Check
+    const creditCheck = canPerformAIAction();
+    if (!creditCheck.allowed) {
+      if (creditCheck.reason === "need_signup") {
+        openSignupModal();
+      } else if (creditCheck.reason === "daily_limit_reached") {
+        openLimitModal();
+      }
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
     setHasSaved(false);
@@ -81,6 +100,7 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
 
       const auditData: SeoAnalysisResult = data.audit || data.data || data;
       setSeoData(auditData);
+      await consumeCredit();
     } catch (err: unknown) {
       console.error("SEO Audit Error:", err);
       const msg = normalizeErrorMessage(err, "Failed to audit website. Please check the URL and try again.");

@@ -1,71 +1,7 @@
 import { PricingPlan, SavedItem } from "../types";
+import { PRICING_PLANS_LIST } from "./plans";
 
-export const PRICING_PLANS: PricingPlan[] = [
-  {
-    id: "free",
-    name: "FREE",
-    priceMonthly: 0,
-    priceAnnual: 0,
-    description: "Essential starter toolkit for solo creators and early-stage micro enterprises.",
-    features: [
-      "Basic SEO suggestions & meta generator",
-      "Standard social media caption ideas",
-      "Basic export checklist & HS code guide",
-      "Limited AI usage (10 queries/day)",
-      "Local dashboard storage",
-    ],
-    cta: "Get Started Free",
-  },
-  {
-    id: "starter",
-    name: "STARTER",
-    priceMonthly: 19,
-    priceAnnual: 15,
-    description: "For ambitious freelancers and emerging local brands scaling customer acquisition.",
-    features: [
-      "Full SEO audit & keyword volume estimates",
-      "7-Day social media content planner",
-      "Target country trade briefs",
-      "50 AI queries/day with faster processing",
-      "Saved reports & export to markdown",
-      "Commercial message generator",
-    ],
-    cta: "Choose Starter",
-  },
-  {
-    id: "business",
-    name: "BUSINESS",
-    priceMonthly: 49,
-    priceAnnual: 39,
-    popular: true,
-    description: "Comprehensive growth engine for manufacturers, exporters, and established startups.",
-    features: [
-      "Advanced Export Market Intelligence",
-      "Buyer cold email & WhatsApp generator",
-      "Competitor SWOT & pricing margin models",
-      "Full business & marketing plan blueprints",
-      "250 AI queries/day + deep research mode",
-      "Team report sharing & priority support",
-    ],
-    cta: "Start Business Plan",
-  },
-  {
-    id: "pro",
-    name: "PRO",
-    priceMonthly: 99,
-    priceAnnual: 79,
-    description: "Unlimited enterprise trade intelligence and dedicated expansion advisory.",
-    features: [
-      "Full international business concierge",
-      "Live tariff & customs documentation checks",
-      "Unlimited AI consultations & generation",
-      "Custom brand voice & multi-language campaigns",
-      "Export container logistics & Incoterms advisor",
-      "Dedicated account manager & API access",
-    ],
-    cta: "Go Enterprise Pro",
-  },
-];
+export const PRICING_PLANS: PricingPlan[] = PRICING_PLANS_LIST;
 
 export const INITIAL_SAVED_ITEMS: SavedItem[] = [
   {

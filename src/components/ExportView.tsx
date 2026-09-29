@@ -27,6 +27,7 @@ import {
 import { SavedItem, ExportAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
 
 interface ExportViewProps {
@@ -35,6 +36,12 @@ interface ExportViewProps {
 
 export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
   const { t, languageInfo } = useLanguage();
+  const { 
+    canPerformAIAction, 
+    consumeCredit, 
+    openSignupModal, 
+    openLimitModal 
+  } = useCredits();
   const [activeSubTool, setActiveSubTool] = useState<
     "opportunities" | "buyer-message" | "product-description" | "checklist" | "country-research" | "quotation-draft"
   >("opportunities");
@@ -78,6 +85,17 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
   const handleRunExportAction = async (forcedTool?: string) => {
     if (!productName.trim()) {
       setErrorMessage("Please enter a product name before running export analysis.");
+      return;
+    }
+
+    // AI Access & Signup Gate Check
+    const creditCheck = canPerformAIAction();
+    if (!creditCheck.allowed) {
+      if (creditCheck.reason === "need_signup") {
+        openSignupModal();
+      } else if (creditCheck.reason === "daily_limit_reached") {
+        openLimitModal();
+      }
       return;
     }
 
@@ -134,6 +152,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
       const payload = data.data || data;
       setExportData(payload);
       setResultContent(payload.content || data.content || "Report generated successfully.");
+      await consumeCredit();
     } catch (err: unknown) {
       console.error("Export Action Error:", err);
       const msg = normalizeErrorMessage(err, "Failed to generate export strategy.");

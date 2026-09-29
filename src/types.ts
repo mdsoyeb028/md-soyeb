@@ -835,6 +835,35 @@ export interface PracticalProblemSolverResult {
   optimization_guidance?: { keep: string[]; change: string[]; pause: string[]; test: string[]; improve: string[]; next_experiment: string };
 }
 
+export type SubscriptionPlanId = "free" | "starter" | "business" | "pro";
+
+export interface PlanConfig {
+  id: SubscriptionPlanId;
+  name: string;
+  priceMonthly: number;
+  priceAnnual: number;
+  dailyQueryLimit: number;
+  popular?: boolean;
+  description: string;
+  features: string[];
+  cta: string;
+}
+
+export interface UserCreditsProfile {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  plan: SubscriptionPlanId;
+  isAnonymous: boolean;
+  consultationsUsed: number;
+  queriesUsedToday: number;
+  lastQueryDate: string; // YYYY-MM-DD
+  preferredLanguage?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface PricingPlan {
   id: string;
   name: string;

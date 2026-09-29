@@ -1,8 +1,9 @@
 import React from "react";
 import { User } from "firebase/auth";
-import { Globe, Bookmark, Sparkles, LogIn } from "lucide-react";
+import { Globe, Bookmark, Sparkles, LogIn, Zap } from "lucide-react";
 import { ActiveTab } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useCredits } from "../context/CreditsContext";
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -21,6 +22,15 @@ export const Header: React.FC<HeaderProps> = ({
   onSignIn,
 }) => {
   const { t } = useLanguage();
+  const { 
+    isAnonymous, 
+    consultationsUsed, 
+    plan, 
+    dailyLimit, 
+    creditsRemaining,
+    openSignupModal,
+    openStatusModal 
+  } = useCredits();
 
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-[#070b16]/80 border-b border-slate-800/80 px-3 sm:px-4 py-3 transition-colors">
@@ -51,6 +61,40 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* Credit Tracker Pill */}
+          <button
+            type="button"
+            onClick={isAnonymous && consultationsUsed >= 1 ? openSignupModal : openStatusModal}
+            className={`px-2 sm:px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+              isAnonymous
+                ? consultationsUsed === 0
+                  ? "bg-purple-950/60 border-purple-500/40 text-purple-300 hover:bg-purple-900/60 shadow-sm shadow-purple-900/20"
+                  : "bg-rose-950/60 border-rose-500/40 text-rose-300 hover:bg-rose-900/60 shadow-sm shadow-rose-900/20"
+                : plan === "pro"
+                ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60"
+                : creditsRemaining === 0
+                ? "bg-rose-950/60 border-rose-500/40 text-rose-300 hover:bg-rose-900/60"
+                : "bg-cyan-950/60 border-cyan-500/40 text-cyan-300 hover:bg-cyan-900/60"
+            }`}
+            title="Click to view AI Credits and subscription details"
+          >
+            <Zap className={`w-3.5 h-3.5 shrink-0 ${
+              isAnonymous && consultationsUsed >= 1 
+                ? "text-rose-400" 
+                : plan === "pro" 
+                ? "text-emerald-400" 
+                : "text-cyan-400"
+            }`} />
+            <span className="text-[11px] font-mono sm:text-xs font-bold">
+              {isAnonymous 
+                ? (consultationsUsed === 0 ? "1 Free AI Test" : "Sign Up (Free)")
+                : dailyLimit === Infinity 
+                ? "PRO • Unlimited"
+                : `AI Credits: ${creditsRemaining}/${dailyLimit} today`
+              }
+            </span>
+          </button>
+
           {/* Saved Reports / Client Dashboard shortcut (Desktop only) */}
           <button
             id="nav-saved-btn"

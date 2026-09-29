@@ -8,22 +8,51 @@ import {
   HelpCircle, 
   X,
   Lock,
-  ArrowRight
+  ArrowRight,
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 import { PRICING_PLANS } from "../data/mockData";
-import { PricingPlan } from "../types";
+import { PricingPlan, SubscriptionPlanId } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useCredits } from "../context/CreditsContext";
 
 export const PricingView: React.FC = () => {
   const { t } = useLanguage();
+  const { 
+    user, 
+    isAnonymous, 
+    plan: activePlan, 
+    upgradePlan, 
+    openSignupModal 
+  } = useCredits();
+
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<PricingPlan | null>(null);
   const [selectedGateway, setSelectedGateway] = useState<"stripe" | "razorpay" | "paypal">("stripe");
   const [checkoutInitiated, setCheckoutInitiated] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
 
   const handleOpenCheckout = (plan: PricingPlan) => {
+    if (isAnonymous) {
+      openSignupModal();
+      return;
+    }
     setSelectedPlanForCheckout(plan);
     setCheckoutInitiated(false);
+  };
+
+  const handleActivatePlan = async () => {
+    if (!selectedPlanForCheckout) return;
+    setIsActivating(true);
+    try {
+      await upgradePlan(selectedPlanForCheckout.id as SubscriptionPlanId);
+      setSelectedPlanForCheckout(null);
+    } catch {
+      // error handled in context
+    } finally {
+      setIsActivating(false);
+    }
   };
 
   const handleSimulateGatewayTrigger = () => {
@@ -97,7 +126,11 @@ export const PricingView: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-base font-extrabold text-white tracking-wide">{plan.name}</h3>
-                  {plan.priceMonthly === 0 ? (
+                  {!isAnonymous && activePlan === plan.id ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      ✓ Active Plan
+                    </span>
+                  ) : plan.priceMonthly === 0 ? (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">
                       Standard
                     </span>
@@ -132,17 +165,24 @@ export const PricingView: React.FC = () => {
                 </ul>
               </div>
 
-              <button
-                onClick={() => handleOpenCheckout(plan)}
-                className={`w-full py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-95 ${
-                  isPopular
-                    ? "bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white shadow-lg shadow-purple-600/30"
-                    : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                }`}
-              >
-                <span>{plan.cta}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              {!isAnonymous && activePlan === plan.id ? (
+                <div className="w-full py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Current Active Plan</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleOpenCheckout(plan)}
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer ${
+                    isPopular
+                      ? "bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white shadow-lg shadow-purple-600/30"
+                      : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                  }`}
+                >
+                  <span>{isAnonymous ? "Sign Up to Select" : plan.cta}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           );
         })}
@@ -218,28 +258,48 @@ export const PricingView: React.FC = () => {
               </div>
             </div>
 
-            {checkoutInitiated ? (
-              <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-700/50 text-xs text-slate-300 space-y-2">
-                <div className="flex items-center gap-2 text-indigo-300 font-bold">
-                  <Lock className="w-4 h-4" />
-                  <span>Gateway Connection Ready</span>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Endpoint route: <code>POST /api/billing/create-checkout-session</code> is pre-wired for <strong>{selectedGateway.toUpperCase()}</strong>. To accept real credit card or UPI transactions, attach your production <code>STRIPE_SECRET_KEY</code> or merchant credentials in environment variables.
-                </p>
-                <div className="text-[10px] text-slate-500 font-mono">
-                  Environment status: Ready for Webhook & Secret key injection.
-                </div>
-              </div>
-            ) : (
+            <div className="space-y-2 pt-2">
               <button
-                onClick={handleSimulateGatewayTrigger}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition-all"
+                onClick={handleActivatePlan}
+                disabled={isActivating}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:via-indigo-500 hover:to-cyan-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition-all cursor-pointer disabled:opacity-60"
               >
-                <Lock className="w-4 h-4" />
-                <span>Initialize {selectedGateway.toUpperCase()} Gateway</span>
+                {isActivating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Activating {selectedPlanForCheckout.name} Plan...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Activate {selectedPlanForCheckout.name} Plan Now</span>
+                  </>
+                )}
               </button>
-            )}
+
+              {checkoutInitiated ? (
+                <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-700/50 text-xs text-slate-300 space-y-2">
+                  <div className="flex items-center gap-2 text-indigo-300 font-bold">
+                    <Lock className="w-4 h-4" />
+                    <span>Gateway Connection Ready</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Endpoint route: <code>POST /api/billing/create-checkout-session</code> is pre-wired for <strong>{selectedGateway.toUpperCase()}</strong>. To accept real credit card or UPI transactions, attach your production <code>STRIPE_SECRET_KEY</code> or merchant credentials in environment variables.
+                  </p>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    Environment status: Ready for Webhook & Secret key injection.
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleSimulateGatewayTrigger}
+                  className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Lock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Connect {selectedGateway.toUpperCase()} Payment Gateway</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -34,6 +34,7 @@ import {
 import { detectUrlPlatform } from "../utils/urlDetector";
 import { useLanguage } from "../i18n/LanguageContext";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { useCredits } from "../context/CreditsContext";
 
 interface PresenceLinkItem {
   id: string;
@@ -52,6 +53,12 @@ export const MultiLinkPresenceAnalyzer: React.FC<MultiLinkPresenceAnalyzerProps>
   savedItemIds = [],
 }) => {
   const { languageInfo } = useLanguage();
+  const { 
+    canPerformAIAction, 
+    consumeCredit, 
+    openSignupModal, 
+    openLimitModal 
+  } = useCredits();
 
   // Links state
   const [links, setLinks] = useState<PresenceLinkItem[]>([
@@ -119,6 +126,17 @@ export const MultiLinkPresenceAnalyzer: React.FC<MultiLinkPresenceAnalyzerProps>
       return;
     }
 
+    // AI Access & Signup Gate Check
+    const creditCheck = canPerformAIAction();
+    if (!creditCheck.allowed) {
+      if (creditCheck.reason === "need_signup") {
+        openSignupModal();
+      } else if (creditCheck.reason === "daily_limit_reached") {
+        openLimitModal();
+      }
+      return;
+    }
+
     setIsLoading(true);
     setLoadingStep(1);
     setErrorMessage(null);
@@ -148,6 +166,7 @@ export const MultiLinkPresenceAnalyzer: React.FC<MultiLinkPresenceAnalyzerProps>
 
       const result: MultiPresenceAnalysisResult = data.data;
       setAnalysisResult(result);
+      await consumeCredit();
 
       // Default active tab to unified if available, else first analyzed section
       if (result.unified_diagnosis) {

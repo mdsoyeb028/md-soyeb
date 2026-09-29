@@ -20,6 +20,7 @@ import {
 import { SavedItem, SocialMediaResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
 
 interface SocialViewProps {
@@ -28,6 +29,12 @@ interface SocialViewProps {
 
 export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
   const { t, languageInfo } = useLanguage();
+  const { 
+    canPerformAIAction, 
+    consumeCredit, 
+    openSignupModal, 
+    openLimitModal 
+  } = useCredits();
   const [platform, setPlatform] = useState<"Instagram" | "Facebook" | "YouTube" | "LinkedIn">("Instagram");
   const [business, setBusiness] = useState("Artisan Ceramic Exporter");
   const [category, setCategory] = useState("Ceramics & Global Home Decor");
@@ -55,6 +62,18 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
       setErrorMessage(t("social.brandPlaceholder", "Please enter your business or brand name before generating content."));
       return;
     }
+
+    // AI Access & Signup Gate Check
+    const creditCheck = canPerformAIAction();
+    if (!creditCheck.allowed) {
+      if (creditCheck.reason === "need_signup") {
+        openSignupModal();
+      } else if (creditCheck.reason === "daily_limit_reached") {
+        openLimitModal();
+      }
+      return;
+    }
+
     if (isLoading) return;
 
     setIsLoading(true);
@@ -101,6 +120,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
 
       const result: SocialMediaResult = data.data || data;
       setSocialData(result);
+      await consumeCredit();
     } catch (err: unknown) {
       console.error("Social generation error:", err);
       const msg = normalizeErrorMessage(err, "Failed to generate social media strategy.");

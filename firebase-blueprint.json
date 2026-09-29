@@ -9,10 +9,19 @@
         "email": { "type": "string" },
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
+        "plan": { 
+          "type": "string",
+          "enum": ["free", "starter", "business", "pro"]
+        },
+        "isAnonymous": { "type": "boolean" },
+        "consultationsUsed": { "type": "number" },
+        "queriesUsedToday": { "type": "number" },
+        "lastQueryDate": { "type": "string" },
+        "preferredLanguage": { "type": "string" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["uid", "email"]
+      "required": ["uid"]
     },
     "Report": {
       "title": "Report",

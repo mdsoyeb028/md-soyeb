@@ -182,13 +182,15 @@ export function categorizeError(err: unknown): { status: number | string; catego
 }
 
 // 1. Primary Gemini models in priority order:
-// gemini-3.1-flash-lite: Fast, lightweight model specified for high responsiveness
-// gemini-3.8-flash: Standard Flash model for general text tasks
-// gemini-flash-latest: Official production alias
+// gemini-3.1-flash-lite: Fast, lightweight model with independent quota pool
+// gemini-flash-latest: Production alias
+// gemini-3.1-pro-preview: High reasoning text model
+// gemini-3.8-flash: Standard Flash model
 const GEMINI_CANDIDATE_MODELS = [
   "gemini-3.1-flash-lite",
-  "gemini-3.8-flash",
   "gemini-flash-latest",
+  "gemini-3.1-pro-preview",
+  "gemini-3.8-flash",
 ];
 
 // 2. Groq candidate models (verified active chat/completion models; excludes deprecated 404 models like llama-3.3-70b-versatile)

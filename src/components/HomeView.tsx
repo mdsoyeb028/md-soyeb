@@ -47,6 +47,7 @@ import {
 } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
 import { MultiLinkPresenceAnalyzer } from "./MultiLinkPresenceAnalyzer";
 
@@ -83,6 +84,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
   savedItemIds = [] 
 }) => {
   const { t, language, languageInfo } = useLanguage();
+  const { 
+    canPerformAIAction, 
+    consumeCredit, 
+    openSignupModal, 
+    openLimitModal 
+  } = useCredits();
   
   // Problem input state
   const [activeToolMode, setActiveToolMode] = useState<"problem" | "presence">("problem");
@@ -162,6 +169,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
     if (!queryToUse) {
       setErrorMessage("Please describe your business problem or choose an option before clicking Solve My Problem.");
+      return;
+    }
+
+    // AI Access & Signup Gate Check
+    const creditCheck = canPerformAIAction();
+    if (!creditCheck.allowed) {
+      if (creditCheck.reason === "need_signup") {
+        openSignupModal();
+      } else if (creditCheck.reason === "daily_limit_reached") {
+        openLimitModal();
+      }
       return;
     }
 
@@ -288,6 +306,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       });
 
       setHasSavedToVault(true);
+      await consumeCredit();
 
       // Scroll smoothly to output
       setTimeout(() => {
