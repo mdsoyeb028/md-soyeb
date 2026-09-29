@@ -615,6 +615,44 @@ export interface PracticalProblemSolverResult {
     score?: number;
     observableIssues?: string[];
   };
+  // Multi-Platform Presence & Cross-Channel Analysis
+  multi_platform_presence?: {
+    platforms_checked: Array<{ url: string; type: string; label: string }>;
+    results: Array<{
+      url: string;
+      type: string;
+      label: string;
+      status: string;
+      access_notes: string;
+      observed_data: {
+        title?: string;
+        description?: string;
+        author_or_brand?: string;
+        handle?: string;
+        thumbnail_or_icon?: string;
+        observable_issues?: string[];
+      };
+      metrics?: {
+        views?: string;
+        subscribers?: string;
+        rating?: string;
+        reviews_count?: string;
+        downloads?: string;
+      };
+      labels?: {
+        observed: string[];
+        inferred: string[];
+        user_provided: string[];
+        needs_verification: string[];
+      };
+    }>;
+    customer_journey_breakdown: {
+      path: string;
+      primary_disconnect: string;
+      where_journey_breaks: string;
+      fix_recommendation: string;
+    };
+  };
   // Real Research Layer
   real_research?: {
     live_research_status: "active" | "unavailable";
@@ -807,3 +845,170 @@ export interface PricingPlan {
   features: string[];
   cta: string;
 }
+
+// Multi-Link Business Presence Analyzer Types
+export type BusinessUrlPlatform =
+  | "website"
+  | "youtube_video"
+  | "youtube_channel"
+  | "instagram"
+  | "facebook"
+  | "linkedin"
+  | "google_business"
+  | "google_play"
+  | "apple_app_store"
+  | "other_business";
+
+export type InformationReliabilityTag =
+  | "OBSERVED"
+  | "INFERRED"
+  | "USER PROVIDED"
+  | "RESEARCHED"
+  | "NEEDS VERIFICATION";
+
+export interface ReliabilityItem<T = string> {
+  value: T;
+  tag: InformationReliabilityTag;
+  note?: string;
+}
+
+export interface WebsiteAnalysisReport {
+  url: string;
+  page_title: ReliabilityItem<string>;
+  meta_description: ReliabilityItem<string>;
+  h1: ReliabilityItem<string[]>;
+  h2: ReliabilityItem<string[]>;
+  visible_content_summary: ReliabilityItem<string>;
+  services_products: ReliabilityItem<string[]>;
+  cta_analysis: ReliabilityItem<string>;
+  contact_information: ReliabilityItem<string>;
+  whatsapp_contact_path: ReliabilityItem<string>;
+  navigation_and_internal_links: ReliabilityItem<string>;
+  images_and_alt_text: ReliabilityItem<string>;
+  technical_seo_signals: ReliabilityItem<string>;
+  conversion_friction: ReliabilityItem<string[]>;
+  business_positioning: ReliabilityItem<string>;
+  trust_elements: ReliabilityItem<string[]>;
+  mobile_signals: ReliabilityItem<string>;
+  page_structure: ReliabilityItem<string>;
+  score?: number;
+  limitations_notice?: string;
+}
+
+export interface YouTubeVideoReport {
+  video_url: string;
+  video_id?: string;
+  video_analysis: string;
+  title_analysis: string;
+  description_analysis: string;
+  thumbnail_hook_observations: string;
+  content_positioning: string;
+  cta_analysis: string;
+  seo_opportunities: string[];
+  improvements: string[];
+  ready_title_options: string[];
+  ready_description: string;
+  ready_cta: string;
+  content_ideas: string[];
+  public_metadata?: {
+    title?: string;
+    author_name?: string;
+    author_url?: string;
+    thumbnail_url?: string;
+    statistics_notice?: string;
+  };
+}
+
+export interface YouTubeChannelReport {
+  channel_url: string;
+  channel_name: string;
+  channel_health: string;
+  content_positioning: string;
+  title_seo_issues: string[];
+  description_issues: string[];
+  content_gaps: string[];
+  cta_issues: string[];
+  branding_issues: string[];
+  growth_opportunities: string[];
+  ready_to_use_improvements: string[];
+  metrics_notice: string;
+}
+
+export interface InstagramBusinessReport {
+  instagram_url: string;
+  account_profile_analysis: string;
+  bio_analysis: string;
+  link_in_bio_analysis: string;
+  positioning: string;
+  content_pillars_observations: string[];
+  engagement_friction: string[];
+  ready_bio_improvements: string[];
+  ready_cta_improvements: string[];
+  story_highlights_recommendations: string[];
+  five_high_converting_post_hooks: string[];
+  three_reel_concepts: Array<{
+    hook: string;
+    body: string;
+    cta: string;
+  }>;
+  access_limitation_notice?: string;
+}
+
+export interface GoogleBusinessProfileReport {
+  gbp_url: string;
+  business_name: string;
+  category_primary_category: string;
+  profile_completeness_observations: string;
+  service_area_address_visibility: string;
+  review_strategy_gaps: string[];
+  local_ranking_friction: string[];
+  local_photo_post_recommendations: string[];
+  high_priority_action_checklist: string[];
+}
+
+export interface AppStoreReport {
+  app_url: string;
+  platform: "google_play" | "apple_app_store" | "other";
+  app_title: string;
+  short_and_long_description: string;
+  category: string;
+  visible_feature_positioning: string;
+  onboarding_friction_signals: string[];
+  aso_keyword_recommendations: string[];
+  screenshot_hook_review: string;
+  download_conversion_friction: string[];
+  review_strategy: string;
+  access_notice?: string;
+}
+
+export interface UnifiedMultiChannelDiagnosis {
+  cross_channel_consistency: string;
+  funnel_drop_off_points: string[];
+  messaging_mismatches: string[];
+  strongest_conversion_asset: string;
+  weakest_link_in_ecosystem: string;
+  unified_priority_action_plan: Array<{
+    priority: number;
+    platform: string;
+    action: string;
+    impact: string;
+  }>;
+}
+
+export interface MultiPresenceAnalysisResult {
+  analyzed_links: Array<{
+    url: string;
+    platform: BusinessUrlPlatform;
+    status: "analyzed" | "limited" | "error";
+  }>;
+  website_analysis?: WebsiteAnalysisReport;
+  youtube_video_analysis?: YouTubeVideoReport;
+  youtube_channel_analysis?: YouTubeChannelReport;
+  instagram_analysis?: InstagramBusinessReport;
+  google_business_analysis?: GoogleBusinessProfileReport;
+  app_analysis?: AppStoreReport;
+  unified_diagnosis?: UnifiedMultiChannelDiagnosis;
+  language: string;
+  disclaimer: string;
+}
+

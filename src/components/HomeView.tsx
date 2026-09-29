@@ -48,6 +48,7 @@ import {
 import { normalizeErrorMessage } from "../utils/errorUtils";
 import { useLanguage } from "../i18n/LanguageContext";
 import { AILanguageSelector } from "./AILanguageSelector";
+import { MultiLinkPresenceAnalyzer } from "./MultiLinkPresenceAnalyzer";
 
 interface HomeViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -76,10 +77,15 @@ const PROBLEM_OPTIONS = [
 
 const LOCAL_STORAGE_PROFILE_KEY = "biz_growth_os_profile_v2";
 
-export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ 
+  setActiveTab, 
+  onSaveItem, 
+  savedItemIds = [] 
+}) => {
   const { t, language, languageInfo } = useLanguage();
   
   // Problem input state
+  const [activeToolMode, setActiveToolMode] = useState<"problem" | "presence">("problem");
   const [problemQuery, setProblemQuery] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -360,11 +366,50 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
       {/* 2. THE BUSINESS PROBLEM CENTER & OPTIONS                       */}
       {/* ============================================================== */}
       <section className="p-4 sm:p-6 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border border-cyan-500/40 shadow-2xl shadow-cyan-950/40 relative space-y-4">
-        {/* Embedded AI Response Language Selection */}
+        {/* Embedded AI Response Language Selection (Compact & Professional) */}
         <AILanguageSelector label="Which language should I use for your AI response?" />
 
-        {/* Rapid Problem Chips */}
-        <div className="space-y-1.5 pt-1">
+        {/* Operating System Tool Mode Switcher */}
+        <div className="flex items-center p-1 rounded-2xl bg-slate-950/80 border border-slate-800 shadow-inner">
+          <button
+            type="button"
+            onClick={() => setActiveToolMode("problem")}
+            className={`flex-1 py-2 sm:py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeToolMode === "problem"
+                ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/25"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            <span>Business Problem Solver</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveToolMode("presence")}
+            id="nav-presence-analyzer-tab"
+            className={`flex-1 py-2 sm:py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeToolMode === "presence"
+                ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/25"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Analyze My Business Presence</span>
+            <span className="hidden sm:inline-block text-[9px] uppercase px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/50">
+              Multi-Link
+            </span>
+          </button>
+        </div>
+
+        {activeToolMode === "presence" ? (
+          <MultiLinkPresenceAnalyzer
+            onSaveReport={onSaveItem}
+            savedItemIds={savedItemIds}
+          />
+        ) : (
+          <div className="space-y-4">
+            {/* Rapid Problem Chips */}
+            <div className="space-y-1.5 pt-1">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
             Select Your Primary Challenge:
           </span>
@@ -639,7 +684,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab, onSaveItem }) 
             )}
           </button>
         </div>
-      </section>
+      </div>
+    )}
+  </section>
 
       {/* ============================================================== */}
       {/* 3. BUSINESS GROWTH OPERATING SYSTEM OUTPUT                     */}

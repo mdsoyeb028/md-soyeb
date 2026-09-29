@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { performRealSeoAudit } from "./src/server/seoCrawler";
 import { generateAICompletion, AIProviderError, normalizeServerErrorMessage } from "./src/server/aiProvider";
 import { performRealResearch, buildVerifiedProspectWorkflow } from "./src/server/researchEngine";
+import { performMultiLinkPresenceAnalysis, detectUrlPlatform } from "./src/server/presenceAnalyzer";
 
 dotenv.config();
 
@@ -333,9 +334,27 @@ TARGET OUTPUT LANGUAGE:
 
 CRITICAL LANGUAGE REQUIREMENT:
 The user has chosen "${selectedLanguage}" as their desired output language.
-You MUST write all generated text in the JSON response strictly in "${selectedLanguage}".
-Even if the user wrote their inquiry in English or another language, translate and provide all answers, scripts, action plans, headlines, and advice in "${selectedLanguage}".
-Only keep official URLs or brand names in their original form.
+When the user selects a language:
+- all AI-generated explanations
+- diagnosis
+- recommendations
+- action plans
+- scripts
+- ads
+- SEO recommendations
+- social recommendations
+- business recommendations
+MUST be generated strictly in that selected language ("${selectedLanguage}").
+
+Do NOT translate:
+- URLs
+- website domains
+- YouTube channel names
+- Instagram handles
+- official product/brand names
+- app names when they are proper names
+
+Support RTL languages correctly when applicable (e.g. Arabic, Urdu, Persian, Hebrew).
 
 Always reply in this exact JSON format:
 {
@@ -1061,6 +1080,63 @@ app.post("/api/ai/prospects", async (req, res) => {
       error: "Unable to process prospect research request.",
     });
   }
+});
+
+// 1c. Multi-Link Business Presence Analyzer Endpoint
+app.post("/api/ai/presence-analyzer", async (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  try {
+    const { links, language, languageName, businessContext } = req.body || {};
+
+    if (!Array.isArray(links) || links.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: "At least one public business link (website, YouTube, Instagram, App, Google Business Profile) is required.",
+      });
+      return;
+    }
+
+    const validLinks = links
+      .filter((item: any) => item && typeof item.url === "string" && item.url.trim().length > 0)
+      .slice(0, 10); // cap to 10 links per request
+
+    if (validLinks.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: "No valid URLs provided in request.",
+      });
+      return;
+    }
+
+    const result = await performMultiLinkPresenceAnalysis(validLinks, {
+      language: typeof language === "string" ? language : undefined,
+      languageName: typeof languageName === "string" ? languageName : undefined,
+      businessContext: typeof businessContext === "string" ? businessContext : undefined,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err: any) {
+    console.error("Presence analyzer endpoint error:", err);
+    res.status(500).json({
+      success: false,
+      error: normalizeServerErrorMessage(err, "Unable to complete omnichannel business presence analysis."),
+    });
+  }
+});
+
+// 1d. Quick URL Platform Detector Endpoint
+app.post("/api/ai/detect-url", (req, res) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const { url } = req.body || {};
+  if (!url || typeof url !== "string") {
+    res.status(400).json({ success: false, error: "A URL string is required." });
+    return;
+  }
+  const detected = detectUrlPlatform(url);
+  res.status(200).json({ success: true, data: detected });
 });
 
 // 2. Real SEO Audit Endpoint (Live Crawler + HTML Parser + Mathematical Score)

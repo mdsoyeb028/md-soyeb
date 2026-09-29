@@ -220,83 +220,46 @@ export const AILanguageSelector: React.FC<AILanguageSelectorProps> = ({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full rounded-2xl bg-gradient-to-r from-slate-900/90 via-cyan-950/20 to-slate-900/90 border border-cyan-500/25 p-3 sm:p-3.5 backdrop-blur-md shadow-md ${className}`}
-    >
-      {/* Header Row: Label & Active Language Preview */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+    <div ref={containerRef} className={`relative w-full ${className}`}>
+      {/* Compact & Professional Top Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-gradient-to-r from-slate-900/95 via-cyan-950/30 to-slate-900/95 border border-cyan-500/30 backdrop-blur-md shadow-sm">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
-            <Globe className="w-3.5 h-3.5" />
-          </div>
-          <div>
-            <span className="text-xs font-semibold text-white tracking-wide block">
-              {label}
-            </span>
-            <span className="text-[10px] text-slate-400">
-              AI outputs complete diagnosis, scripts & action plans in this language
-            </span>
-          </div>
+          <span className="text-base" role="img" aria-label="Globe">🌐</span>
+          <span className="text-xs font-semibold text-slate-200">
+            Response Language:
+          </span>
+          <span className="hidden sm:inline-block text-[10px] text-slate-400">
+            (AI explains, plans & writes in this language)
+          </span>
         </div>
 
-        {/* Current Active Indicator Pill */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 text-xs font-semibold">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <span>{languageInfo.nativeName}</span>
-          {languageInfo.nativeName !== languageInfo.name && (
-            <span className="text-[10px] text-cyan-400/80 font-normal">({languageInfo.name})</span>
-          )}
-          {isRtl && (
-            <span className="text-[9px] px-1 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800/40 uppercase">
-              RTL
-            </span>
-          )}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95 ${
+              isOpen
+                ? "bg-cyan-500 text-slate-950 border-cyan-400 font-bold"
+                : "bg-cyan-950/80 hover:bg-cyan-900/90 border-cyan-500/40 text-cyan-300 hover:text-white"
+            }`}
+            aria-haspopup="dialog"
+            aria-expanded={isOpen}
+            id="ai-language-selector-btn"
+          >
+            <span>{languageInfo.nativeName}</span>
+            {languageInfo.nativeName !== languageInfo.name && (
+              <span className="text-[10px] opacity-75 hidden xs:inline">({languageInfo.name})</span>
+            )}
+            {isRtl && (
+              <span className="text-[9px] px-1 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800/40 uppercase font-mono">
+                RTL
+              </span>
+            )}
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
-      </div>
-
-      {/* Language Quick Selection Pills + "Other..." Searchable Dropdown */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-1">
-        {quickLangs.map((lang) => {
-          const active = isCurrentLang(lang.code);
-          return (
-            <button
-              key={lang.code}
-              type="button"
-              onClick={() => handleSelect(lang)}
-              className={`px-2.5 py-1 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1 active:scale-95 ${
-                active
-                  ? "bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/30 ring-1 ring-cyan-300"
-                  : "bg-slate-950/70 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-cyan-500/30"
-              }`}
-              title={`${lang.nativeName} (${lang.name})`}
-            >
-              {active && <Check className="w-3 h-3 text-slate-950 stroke-[3]" />}
-              <span>{lang.nativeName}</span>
-              {lang.code === "en" && <span className="text-[10px] opacity-75">(Eng)</span>}
-            </button>
-          );
-        })}
-
-        {/* "Other..." Searchable Button */}
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
-            isOpen
-              ? "bg-cyan-500/30 text-cyan-300 border border-cyan-400"
-              : "bg-gradient-to-r from-blue-600/30 to-purple-600/30 hover:from-blue-600/40 hover:to-purple-600/40 text-purple-200 hover:text-white border border-purple-500/40 hover:border-purple-400"
-          }`}
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
-          title="Search all 70+ world languages"
-        >
-          <Search className="w-3 h-3 text-purple-300" />
-          <span>Other Languages... (70+)</span>
-          <ChevronDown
-            className={`w-3 h-3 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-          />
-        </button>
       </div>
 
       {/* Accessible Searchable Popover Dropdown Modal */}

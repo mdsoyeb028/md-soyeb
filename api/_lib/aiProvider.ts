@@ -440,26 +440,20 @@ export async function callGemini(
       });
 
       // Immediate failover triggers:
-      // If Gemini returns 503 (high demand), 429 (quota), 500, 502, 504, or times out,
-      // throw immediately so generateAICompletion directly hands off to Groq!
+      // If error is specific to this model (e.g. per-model quota), try next Gemini candidate model.
+      // If it's a global 503 (high demand) or all models have failed, throw to hand off to Groq immediately.
       if (
-        status === 503 ||
-        status === 429 ||
-        status === 500 ||
-        status === 502 ||
-        status === 504 ||
-        category === "PROVIDER_UNAVAILABLE" ||
-        category === "RATE_LIMIT_OR_QUOTA" ||
-        category === "TIMEOUT" ||
-        message.includes("high demand") ||
-        message.includes("quota")
+        (status === 503 || category === "PROVIDER_UNAVAILABLE" || message.includes("high demand") || message.includes("overloaded")) &&
+        i === GEMINI_CANDIDATE_MODELS.length - 1
       ) {
         throw new Error(`Gemini ${category} (HTTP ${status}): ${message}`);
       }
 
       if (i === GEMINI_CANDIDATE_MODELS.length - 1) {
-        break;
+        throw new Error(`All Gemini models failed. Last error: ${message}`);
       }
+      // Try next candidate model
+      continue;
     } finally {
       if (timer) clearTimeout(timer);
     }

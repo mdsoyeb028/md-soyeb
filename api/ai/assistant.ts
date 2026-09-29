@@ -188,9 +188,27 @@ TARGET OUTPUT LANGUAGE:
 
 CRITICAL LANGUAGE REQUIREMENT:
 The user has chosen "${selectedLanguage}" as their desired output language.
-You MUST write all generated text in the JSON response strictly in "${selectedLanguage}".
-Even if the user wrote their inquiry in English or another language, translate and provide all answers, scripts, action plans, headlines, and advice in "${selectedLanguage}".
-Only keep official URLs or brand names in their original form.
+When the user selects a language:
+- all AI-generated explanations
+- diagnosis
+- recommendations
+- action plans
+- scripts
+- ads
+- SEO recommendations
+- social recommendations
+- business recommendations
+MUST be generated strictly in that selected language ("${selectedLanguage}").
+
+Do NOT translate:
+- URLs
+- website domains
+- YouTube channel names
+- Instagram handles
+- official product/brand names
+- app names when they are proper names
+
+Support RTL languages correctly when applicable (e.g. Arabic, Urdu, Persian, Hebrew).
 
 Always reply in this exact JSON format:
 {
