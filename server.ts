@@ -24,6 +24,15 @@ import {
   detectIntent 
 } from "./src/server/intentAndLanguageDetector";
 import { handleConversationalResponse } from "./src/server/conversationalHandler";
+import { 
+  verifyPlanLimit, 
+  recordSuccessfulUsage, 
+  isProviderQuotaError, 
+  getProviderQuotaErrorMessage 
+} from "./src/server/planEnforcement";
+import { handleAgentVoiceInteraction } from "./src/server/agentVoiceHandler";
+import { generateBusinessAgentProfile } from "./src/server/businessAgentGenerator";
+import { CENTRAL_PLANS } from "./src/data/plans";
 
 dotenv.config();
 
@@ -347,6 +356,145 @@ function getProviderSourceName(provider: "gemini" | "groq" | "openrouter"): stri
   return "openrouter-free";
 }
 
+// Configurable Plans Configuration Endpoint
+app.get("/api/plans/config", (_req, res) => {
+  res.json({
+    success: true,
+    plans: CENTRAL_PLANS,
+  });
+});
+
+// Create My Business AI Agent
+app.post("/api/ai/agent-create", async (req, res) => {
+  try {
+    const { 
+      name, 
+      industry, 
+      location, 
+      website, 
+      productsServices, 
+      targetCustomers, 
+      description, 
+      preferredLanguage, 
+      brandTone, 
+      socialUrls, 
+      businessGoals, 
+      customInstructions,
+      userId,
+      userPlan,
+      isAnonymous
+    } = req.body || {};
+
+    if (!name || !industry) {
+      res.status(400).json({ success: false, error: "Business name and industry are required to create an agent." });
+      return;
+    }
+
+    // Server-side plan limit check
+    const planCheck = verifyPlanLimit({
+      userId,
+      clientPlan: userPlan,
+      isAnonymous,
+      clientIp: req.ip,
+    });
+
+    if (!planCheck.allowed) {
+      res.status(429).json({
+        success: false,
+        error: planCheck.code,
+        message: planCheck.message,
+        limit: planCheck.limit,
+        plan: planCheck.plan,
+      });
+      return;
+    }
+
+    const generated = await generateBusinessAgentProfile({
+      name,
+      industry,
+      location: location || "Global",
+      website,
+      productsServices,
+      targetCustomers,
+      description,
+      preferredLanguage: preferredLanguage || "English",
+      brandTone,
+      socialUrls,
+      businessGoals,
+      customInstructions,
+      userId,
+    });
+
+    // Record usage only on success
+    recordSuccessfulUsage(userId, req.ip);
+
+    res.json({ success: true, ...generated });
+  } catch (err: unknown) {
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Voice Agent Interaction (Talk to AI)
+app.post("/api/ai/agent-voice", async (req, res) => {
+  try {
+    const { 
+      speechText, 
+      agentConfig, 
+      conversationHistory, 
+      language,
+      userId,
+      userPlan,
+      isAnonymous
+    } = req.body || {};
+
+    if (!speechText || typeof speechText !== "string" || !speechText.trim()) {
+      res.status(400).json({ success: false, error: "Spoken text is required." });
+      return;
+    }
+
+    // Server-side plan limit check
+    const planCheck = verifyPlanLimit({
+      userId,
+      clientPlan: userPlan,
+      isAnonymous,
+      clientIp: req.ip,
+    });
+
+    if (!planCheck.allowed) {
+      res.status(429).json({
+        success: false,
+        error: planCheck.code,
+        message: planCheck.message,
+        limit: planCheck.limit,
+        plan: planCheck.plan,
+      });
+      return;
+    }
+
+    const voiceRes = await handleAgentVoiceInteraction({
+      speechText: speechText.trim(),
+      agentConfig,
+      conversationHistory,
+      language: language || "English",
+    });
+
+    // Record usage on success
+    recordSuccessfulUsage(userId, req.ip);
+
+    res.json({ success: true, ...voiceRes });
+  } catch (err: unknown) {
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
 // 1. Central AI Business Assistant & Self-Solving Engine
 app.post("/api/ai/assistant", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -361,6 +509,10 @@ app.post("/api/ai/assistant", async (req, res) => {
       websiteUrl,
       doItForMe,
       businessProfile,
+      userId,
+      userPlan,
+      isAnonymous,
+      consultationsUsed,
     } = req.body || {};
 
     if (!query || typeof query !== "string" || !query.trim()) {
@@ -375,6 +527,26 @@ app.post("/api/ai/assistant", async (req, res) => {
       res.status(400).json({ 
         success: false, 
         error: "Inquiry query exceeds 3,000 characters limit." 
+      });
+      return;
+    }
+
+    // Server-side plan limit check
+    const planCheck = verifyPlanLimit({
+      userId,
+      clientPlan: userPlan,
+      isAnonymous,
+      consultationsUsed,
+      clientIp: req.ip,
+    });
+
+    if (!planCheck.allowed) {
+      res.status(429).json({
+        success: false,
+        error: planCheck.code,
+        message: planCheck.message,
+        limit: planCheck.limit,
+        plan: planCheck.plan,
       });
       return;
     }
@@ -401,6 +573,8 @@ app.post("/api/ai/assistant", async (req, res) => {
         targetLanguage: selectedLanguage,
         conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : [],
       });
+
+      recordSuccessfulUsage(userId, req.ip);
 
       res.json({
         success: true,
@@ -1225,8 +1399,19 @@ ${practicalResult.next_one_thing}
       content: markdownContent,
       source: sourceName,
     });
+
+    recordSuccessfulUsage(userId, req.ip);
   } catch (err: unknown) {
     console.error("Assistant API error:", err);
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({
+        success: false,
+        error: "provider_quota_reached",
+        message: getProviderQuotaErrorMessage(),
+        code: "PROVIDER_QUOTA_REACHED"
+      });
+      return;
+    }
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({
         success: false,

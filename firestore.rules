@@ -26,8 +26,22 @@ service cloud.firestore {
     function isValidReport(data, userId) {
       return data.userId == userId &&
         data.id is string && data.id.size() <= 128 &&
-        data.type in ['seo', 'social', 'export', 'business', 'assistant', 'ai-assistant'] &&
+        data.type in ['seo', 'social', 'export', 'business', 'assistant', 'ai-assistant', 'traffic'] &&
         data.title is string && data.title.size() <= 500;
+    }
+
+    function isValidAgent(data, userId) {
+      return data.userId == userId &&
+        data.id is string && data.id.size() <= 128 &&
+        data.name is string && data.name.size() <= 200 &&
+        data.industry is string;
+    }
+
+    function isValidTask(data, userId) {
+      return data.userId == userId &&
+        data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() <= 300 &&
+        data.status in ['PREPARED BY AI', 'WAITING FOR APPROVAL', 'EXECUTED', 'COMPLETED', 'FAILED'];
     }
 
     // User profile document
@@ -41,6 +55,24 @@ service cloud.firestore {
         allow get, list: if isOwner(userId);
         allow create: if isOwner(userId) && isValidReport(request.resource.data, userId);
         allow update: if isOwner(userId) && isValidReport(request.resource.data, userId) &&
+          request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Private custom AI business agents subcollection
+      match /agents/{agentId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidAgent(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidAgent(request.resource.data, userId) &&
+          request.resource.data.userId == resource.data.userId;
+        allow delete: if isOwner(userId);
+      }
+
+      // Private tasks & external action approvals subcollection
+      match /tasks/{taskId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTask(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidTask(request.resource.data, userId) &&
           request.resource.data.userId == resource.data.userId;
         allow delete: if isOwner(userId);
       }

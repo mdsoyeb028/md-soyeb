@@ -837,6 +837,18 @@ export interface PracticalProblemSolverResult {
 
 export type SubscriptionPlanId = "free" | "starter" | "business" | "pro";
 
+export interface BusinessAgentPlanFeatures {
+  maxAgents: number; // 1, 1, 3, 10
+  voiceTier: "Limited" | "Standard" | "Advanced";
+  businessContextTier: "Basic" | "Standard" | "Deep" | "Advanced Context & Memory";
+  maxDailyRequests: number; // 10, 50, 250, Infinity
+  customBrandVoice: boolean;
+  teamSupport: boolean;
+  summaryPills: string[]; // Card compact pills e.g. ['Basic Chat', 'Limited Voice', 'Business Context', '10 AI requests/day']
+  detailedFeatures: string[];
+  fairUseNotice?: string;
+}
+
 export interface PlanConfig {
   id: SubscriptionPlanId;
   name: string;
@@ -846,6 +858,7 @@ export interface PlanConfig {
   popular?: boolean;
   description: string;
   features: string[];
+  agentFeatures: BusinessAgentPlanFeatures;
   cta: string;
 }
 
@@ -872,7 +885,52 @@ export interface PricingPlan {
   popular?: boolean;
   description: string;
   features: string[];
+  agentFeatures?: BusinessAgentPlanFeatures;
   cta: string;
+}
+
+export interface BusinessAgentConfig {
+  id: string;
+  userId: string;
+  name: string;
+  industry: string;
+  location: string;
+  website?: string;
+  productsServices?: string;
+  targetCustomers?: string;
+  description?: string;
+  preferredLanguage?: string;
+  brandTone?: string;
+  socialUrls?: string[];
+  businessGoals?: string;
+  customInstructions?: string;
+  isDefault?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AgentActionLifecycleStatus =
+  | "PREPARED BY AI"
+  | "WAITING FOR APPROVAL"
+  | "EXECUTED"
+  | "COMPLETED"
+  | "FAILED";
+
+export interface AgentActionTask {
+  id: string;
+  userId: string;
+  agentId?: string;
+  title: string;
+  category: "marketing" | "sales" | "support" | "seo" | "outreach" | "ads" | "content" | "general";
+  actionType: string;
+  status: AgentActionLifecycleStatus;
+  details: string;
+  previewContent: string;
+  estimatedCostOrBudget?: string;
+  targetPlatform?: string;
+  executionNotes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Multi-Link Business Presence Analyzer Types

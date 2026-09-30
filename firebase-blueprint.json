@@ -32,7 +32,7 @@
         "userId": { "type": "string" },
         "type": {
           "type": "string",
-          "enum": ["seo", "social", "export", "business", "assistant"]
+          "enum": ["seo", "social", "export", "business", "assistant", "ai-assistant", "traffic"]
         },
         "title": { "type": "string", "maxLength": 500 },
         "input": { "type": "object" },
@@ -46,6 +46,56 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "userId", "type", "title"]
+    },
+    "BusinessAgent": {
+      "title": "BusinessAgent",
+      "description": "Customizable AI Business Agent profile and configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 200 },
+        "industry": { "type": "string", "maxLength": 100 },
+        "location": { "type": "string", "maxLength": 150 },
+        "website": { "type": "string", "maxLength": 500 },
+        "productsServices": { "type": "string", "maxLength": 2000 },
+        "targetCustomers": { "type": "string", "maxLength": 1000 },
+        "description": { "type": "string", "maxLength": 3000 },
+        "preferredLanguage": { "type": "string", "maxLength": 50 },
+        "brandTone": { "type": "string", "maxLength": 100 },
+        "socialUrls": { "type": "array" },
+        "businessGoals": { "type": "string", "maxLength": 2000 },
+        "customInstructions": { "type": "string", "maxLength": 4000 },
+        "isDefault": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "industry"]
+    },
+    "AgentTask": {
+      "title": "AgentTask",
+      "description": "Business Agent prepared task following the approval lifecycle",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "agentId": { "type": "string" },
+        "title": { "type": "string", "maxLength": 300 },
+        "category": { "type": "string", "maxLength": 100 },
+        "actionType": { "type": "string", "maxLength": 100 },
+        "status": {
+          "type": "string",
+          "enum": ["PREPARED BY AI", "WAITING FOR APPROVAL", "EXECUTED", "COMPLETED", "FAILED"]
+        },
+        "details": { "type": "string", "maxLength": 10000 },
+        "previewContent": { "type": "string", "maxLength": 10000 },
+        "estimatedCostOrBudget": { "type": "string", "maxLength": 100 },
+        "targetPlatform": { "type": "string", "maxLength": 100 },
+        "executionNotes": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "status"]
     }
   },
   "firestore": {
@@ -56,6 +106,14 @@
     "/users/{userId}/reports/{reportId}": {
       "schema": "Report",
       "description": "Private subcollection of reports belonging strictly to the user"
+    },
+    "/users/{userId}/agents/{agentId}": {
+      "schema": "BusinessAgent",
+      "description": "Private subcollection of custom AI Business Agents for this user"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "AgentTask",
+      "description": "Private subcollection of tasks and action approvals for this user"
     }
   }
 }
