@@ -33,13 +33,8 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children, us
       if (saved) {
         return matchSupportedLanguage(saved).code;
       }
-      const navLang = navigator.language || (navigator as any).userLanguage;
-      if (navLang) {
-        const detected = matchSupportedLanguage(navLang);
-        return detected.code;
-      }
     }
-    return "en";
+    return "auto";
   });
 
   const languageInfo = getLanguageInfo(language);

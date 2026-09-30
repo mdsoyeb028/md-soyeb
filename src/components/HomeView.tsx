@@ -126,6 +126,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [practicalResult, setPracticalResult] = useState<PracticalProblemSolverResult | null>(null);
   const [solutionPack, setSolutionPack] = useState<SolutionPack | null>(null);
   
+  // Conversational response state
+  const [conversationalReply, setConversationalReply] = useState<string | null>(null);
+  const [suggestedReplies, setSuggestedReplies] = useState<string[]>([]);
+  const [conversationHistory, setConversationHistory] = useState<Array<{ role: "user" | "assistant"; content: string; mode?: string }>>([]);
+  
   // Interactive UI state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [completedDays, setCompletedDays] = useState<Record<number, boolean>>({});
@@ -211,6 +216,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         },
         body: JSON.stringify({ 
           query: queryToUse,
+          conversationHistory: conversationHistory.slice(-6),
           websiteUrl: urlToUse || undefined,
           doItForMe: true,
           language: languageInfo.code,
@@ -235,6 +241,31 @@ export const HomeView: React.FC<HomeViewProps> = ({
       if (!res.ok || data.success === false) {
         throw new Error(normalizeErrorMessage(data?.error || data?.message, "Problem solver is temporarily busy. Please retry."));
       }
+
+      // Check if this response is a natural conversation response (not business mode)
+      if (data.mode === "conversational") {
+        const reply = data.replyText || data.text || "Main theek hoon 😊 Aap kaise ho?";
+        setConversationalReply(reply);
+        setSuggestedReplies(data.suggestedQuickReplies || []);
+        setConversationHistory((prev) => [
+          ...prev,
+          { role: "user", content: queryToUse },
+          { role: "assistant", content: reply, mode: "conversational" },
+        ]);
+        setPracticalResult(null);
+        setSolutionPack(null);
+        await consumeCredit();
+        return;
+      }
+
+      // Business problem response handling
+      setConversationalReply(null);
+      setSuggestedReplies([]);
+      setConversationHistory((prev) => [
+        ...prev,
+        { role: "user", content: queryToUse },
+        { role: "assistant", content: (data.data || data).real_problem || "Business Diagnosis", mode: "business" },
+      ]);
 
       const payload = data.data || data;
       const practical: PracticalProblemSolverResult = payload.practicalResult || {
@@ -505,10 +536,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="flex items-center justify-between text-xs">
             <label htmlFor="problem-textarea" className="font-bold text-slate-200 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              Describe your problem
+              Ask anything or describe your business challenge
             </label>
             <span className="text-[11px] text-cyan-400 font-mono">
-              In any language • Answers in {languageInfo.nativeName}
+              Natural conversation & problem solving • {languageInfo.name}
             </span>
           </div>
 
@@ -523,7 +554,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 handleSolveProblem();
               }
             }}
-            placeholder='e.g. "My interior design business is not getting enough customers from Kolkata." or "Website gets 500 visitors but 0 orders. People bounce immediately."'
+            placeholder='e.g. "Aap kaise ho?", "How are you?", "Google Analytics kya hota hai?", or "My business needs more paying customers."'
             className="w-full rounded-2xl bg-slate-950 border border-slate-700/80 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 text-white placeholder-slate-500 p-3.5 text-xs sm:text-sm leading-relaxed resize-none outline-none transition-all"
           />
         </div>
@@ -740,12 +771,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
             {isLoading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin text-slate-950" />
-                <span>Running Business Growth OS...</span>
+                <span>Thinking & Diagnosing...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5 text-slate-950 fill-slate-950" />
-                <span>🚀 Solve My Business Problem</span>
+                <span>🚀 Ask Assistant / Solve Problem</span>
               </>
             )}
           </button>
@@ -753,6 +784,47 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
     )}
   </section>
+
+      {/* Natural Conversational Response Card */}
+      {conversationalReply && (
+        <section className="p-5 rounded-3xl bg-slate-900/95 border border-cyan-500/40 shadow-2xl space-y-3 animate-in fade-in">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs border border-cyan-500/30">
+                AI
+              </div>
+              <span className="text-xs font-bold text-white">Assistant</span>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 text-cyan-300 border border-slate-800">
+              Natural Conversation
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 text-sm text-slate-100 leading-relaxed font-sans">
+            {conversationalReply}
+          </div>
+
+          {/* Suggested Quick Replies */}
+          {suggestedReplies.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-[10px] text-slate-500 uppercase font-semibold mr-1">Quick reply:</span>
+              {suggestedReplies.map((reply, rIdx) => (
+                <button
+                  key={rIdx}
+                  type="button"
+                  onClick={() => {
+                    setProblemQuery(reply);
+                    handleSolveProblem(reply);
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs text-cyan-300 hover:text-white transition-all cursor-pointer"
+                >
+                  {reply}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ============================================================== */}
       {/* 3. BUSINESS GROWTH OPERATING SYSTEM OUTPUT                     */}

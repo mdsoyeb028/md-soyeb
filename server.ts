@@ -18,6 +18,12 @@ import {
   generateAdsPlan, 
   generateProblemFixPlan 
 } from "./src/server/problemSolver";
+import { 
+  detectLanguage, 
+  resolveTargetLanguage, 
+  detectIntent 
+} from "./src/server/intentAndLanguageDetector";
+import { handleConversationalResponse } from "./src/server/conversationalHandler";
 
 dotenv.config();
 
@@ -376,7 +382,39 @@ app.post("/api/ai/assistant", async (req, res) => {
     const trimmedQuery = query.trim();
     const domainContext = category && typeof category === "string" ? category.trim() : "General Business Growth & Export Strategy";
     const extraContext = context && typeof context === "string" ? context.trim() : "";
-    const selectedLanguage = languageName || language || "English";
+    
+    // Automatic Language Matching & Intent Detection
+    const manualLang = languageName || language;
+    const detectedLang = detectLanguage(trimmedQuery, manualLang);
+    const selectedLanguage = resolveTargetLanguage(detectedLang, manualLang);
+    const detectedIntent = detectIntent(trimmedQuery, conversationHistory);
+
+    // If intent is CASUAL_CONVERSATION or GENERAL_QUESTION without active website URL:
+    if (
+      detectedIntent === "CASUAL_CONVERSATION" || 
+      (detectedIntent === "GENERAL_QUESTION" && !websiteUrl && !trimmedQuery.toLowerCase().includes("plan") && !trimmedQuery.toLowerCase().includes("audit"))
+    ) {
+      const convRes = await handleConversationalResponse({
+        query: trimmedQuery,
+        intent: detectedIntent,
+        languageDetection: detectedLang,
+        targetLanguage: selectedLanguage,
+        conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : [],
+      });
+
+      res.json({
+        success: true,
+        mode: "conversational",
+        intent: detectedIntent,
+        language: selectedLanguage,
+        text: convRes.replyText,
+        replyText: convRes.replyText,
+        content: convRes.replyText,
+        suggestedQuickReplies: convRes.suggestedQuickReplies || [],
+      });
+      return;
+    }
+
     const historyText = Array.isArray(conversationHistory) 
       ? conversationHistory.map((m: { role?: string; content?: string }) => `${m.role || "user"}: ${m.content || ""}`).join("\n")
       : "";

@@ -6,6 +6,7 @@ import { useCredits } from "../context/CreditsContext";
 
 // Quick-select primary language codes prominently displayed in the AI selector
 const PRIMARY_LANG_CODES = [
+  "auto",  // Auto / Same as user (Default)
   "en",    // English
   "hi",    // हिन्दी (Hindi)
   "bn",    // বাংলা (Bengali)

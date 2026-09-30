@@ -20,6 +20,9 @@ export interface LanguageInfo {
 }
 
 export const WORLD_LANGUAGES: LanguageInfo[] = [
+  // --- DEFAULT AUTO-MATCH LANGUAGE ---
+  { code: "auto", name: "Auto / Same as user", nativeName: "Auto / Same as user", direction: "ltr", region: "Recommended", popular: true },
+
   // --- POPULAR / RECOMMENDED WORLD LANGUAGES ---
   { code: "en", name: "English", nativeName: "English", direction: "ltr", region: "Europe", popular: true },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी", direction: "ltr", region: "South Asia", popular: true },
