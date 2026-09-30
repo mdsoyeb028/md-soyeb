@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, Search, Smartphone, Globe2, Briefcase } from "lucide-react";
+import { Home, Search, Smartphone, Globe2, Briefcase, BarChart3 } from "lucide-react";
 import { ActiveTab } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -13,6 +13,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab })
 
   const tabs = [
     { id: "home" as const, label: t("nav.home", "Home"), icon: Home },
+    { id: "traffic" as const, label: "Traffic", icon: BarChart3 },
     { id: "seo" as const, label: t("nav.seo", "SEO"), icon: Search },
     { id: "social" as const, label: t("nav.social", "Social"), icon: Smartphone },
     { id: "export" as const, label: t("nav.export", "Export"), icon: Globe2 },

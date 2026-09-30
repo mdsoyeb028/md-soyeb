@@ -1,6 +1,6 @@
 import React from "react";
 import { User } from "firebase/auth";
-import { Globe, Bookmark, Sparkles, LogIn, Zap } from "lucide-react";
+import { Globe, Bookmark, Sparkles, LogIn, Zap, BarChart3 } from "lucide-react";
 import { ActiveTab } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
@@ -93,6 +93,21 @@ export const Header: React.FC<HeaderProps> = ({
                 : `AI Credits: ${creditsRemaining}/${dailyLimit} today`
               }
             </span>
+          </button>
+
+          {/* Traffic & Performance Center shortcut */}
+          <button
+            id="nav-traffic-btn"
+            onClick={() => setActiveTab("traffic")}
+            className={`flex px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border text-xs font-semibold transition-all items-center gap-1 sm:gap-1.5 cursor-pointer ${
+              activeTab === "traffic"
+                ? "bg-cyan-500/25 text-cyan-300 border-cyan-500/60 shadow-sm shadow-cyan-500/20"
+                : "bg-slate-900/80 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700"
+            }`}
+            title="Traffic & Performance Center"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[11px] sm:text-xs">Traffic</span>
           </button>
 
           {/* Saved Reports / Client Dashboard shortcut (Desktop only) */}

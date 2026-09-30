@@ -30,6 +30,7 @@ const ExportView = lazy(() => import("./components/ExportView").then(m => ({ def
 const BusinessView = lazy(() => import("./components/BusinessView").then(m => ({ default: m.BusinessView })));
 const DashboardView = lazy(() => import("./components/DashboardView").then(m => ({ default: m.DashboardView })));
 const PricingView = lazy(() => import("./components/PricingView").then(m => ({ default: m.PricingView })));
+const TrafficPerformanceView = lazy(() => import("./components/TrafficPerformanceView").then(m => ({ default: m.TrafficPerformanceView })));
 
 const AppModals: React.FC<{ setActiveTab: (tab: ActiveTab) => void }> = ({ setActiveTab }) => {
   const { 
@@ -239,6 +240,10 @@ export default function App() {
                   <span className="text-xs">Loading growth tools...</span>
                 </div>
               }>
+                {activeTab === "traffic" && (
+                  <TrafficPerformanceView onSaveItem={handleSaveItem} />
+                )}
+
                 {activeTab === "seo" && (
                   <SeoView onSaveItem={handleSaveItem} />
                 )}

@@ -1,9 +1,9 @@
-export type ActiveTab = "home" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing";
+export type ActiveTab = "home" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing";
 
 export interface SavedItem {
   id: string;
   userId?: string;
-  type: "seo" | "social" | "export" | "business" | "assistant" | "ai-assistant";
+  type: "seo" | "social" | "export" | "business" | "assistant" | "ai-assistant" | "traffic";
   title: string;
   summary: string;
   input?: Record<string, unknown> | string;
@@ -1038,6 +1038,101 @@ export interface MultiPresenceAnalysisResult {
   app_analysis?: AppStoreReport;
   unified_diagnosis?: UnifiedMultiChannelDiagnosis;
   language: string;
+  disclaimer: string;
+}
+
+export interface TrafficFunnelItem {
+  stageId: string;
+  name: string;
+  hindiExplanation: string;
+  connected: boolean;
+  value: number | null;
+  displayValue: string;
+  label: "OBSERVED" | "USER PROVIDED" | "RESEARCHED" | "INFERRED" | "ESTIMATED" | "NEEDS VERIFICATION";
+  note: string;
+}
+
+export interface TrafficSourceItem {
+  id: string;
+  source: string;
+  sharePercent: number | null;
+  connected: boolean;
+  displayShare: string;
+  whatItMeans: string;
+  currentPerformance: string;
+  problem: string;
+  possibleReason: string;
+  recommendedAction: string;
+  metricToMonitor: string;
+}
+
+export interface DiagnosticCardItem {
+  id: string;
+  category: "critical" | "attention" | "opportunity" | "working_well";
+  categoryEmoji: "🔴" | "🟠" | "🟡" | "🟢";
+  categoryTitle: string;
+  metricName: string;
+  observedData: string;
+  problem: string;
+  possibleCause: string;
+  evidence: string;
+  whatToFix: string;
+  howToFixIt: string;
+  expectedMetricToMonitor: string;
+  dataLabel: "OBSERVED" | "USER PROVIDED" | "RESEARCHED" | "INFERRED" | "ESTIMATED" | "NEEDS VERIFICATION";
+  canFixWithAI: boolean;
+}
+
+export interface VisualAnnotation {
+  id: string;
+  label: string;
+  box_2d: [number, number, number, number];
+  severity: "critical" | "warning" | "opportunity";
+  description: string;
+}
+
+export interface ScreenshotAnalysisResult {
+  imageType: string;
+  whatISee: string;
+  theProblem: string;
+  whyItMatters: string;
+  howToFixIt: string;
+  nextStep: string;
+  visibleNumbersAndMetrics: string[];
+  annotations: VisualAnnotation[];
+  websiteUxAnalysis?: {
+    header: string;
+    navigation: string;
+    heroSection: string;
+    cta: string;
+    services: string;
+    trustElements: string;
+    contactOptions: string;
+    visualHierarchy: string;
+    conversionFriction: string[];
+  };
+  adAnalysis?: {
+    hook: string;
+    offer: string;
+    cta: string;
+    visualHierarchy: string;
+    targetAudienceClarity: string;
+    messageClarity: string;
+    conversionWeaknesses: string[];
+    betterVersion: {
+      newHeadline: string;
+      primaryText: string;
+      cta: string;
+      creativeDirection: string;
+      landingPageRecommendation: string;
+    };
+  };
+  suggestedActionPlan: Array<{
+    stepNumber: number;
+    action: string;
+    toolsNeeded: string;
+    metricToMonitor: string;
+  }>;
   disclaimer: string;
 }
 

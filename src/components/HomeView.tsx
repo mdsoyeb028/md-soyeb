@@ -36,7 +36,9 @@ import {
   Share2,
   PhoneCall,
   Activity,
-  Compass
+  Compass,
+  BarChart3,
+  Camera
 } from "lucide-react";
 import { 
   ActiveTab, 
@@ -379,6 +381,51 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
           From zero customers to website leaks, ad campaigns, and sales scripts — we diagnose the root cause, inspect your website, and prepare ready-to-use materials you can copy and paste immediately.
         </p>
+
+        {/* Quick Launch Cards for Traffic & Performance + Screenshot Solver */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-left">
+          <button
+            type="button"
+            onClick={() => setActiveTab("traffic")}
+            className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-slate-900 border border-indigo-500/40 hover:border-indigo-400 text-left transition-all cursor-pointer group shadow-lg shadow-indigo-950/30 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 group-hover:scale-105 transition-transform">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-white block group-hover:text-cyan-300 transition-colors">
+                  Traffic & Performance Center
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  Diagnose real traffic bottlenecks, GA4 tags & search leaks
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("traffic")}
+            className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/80 to-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-left transition-all cursor-pointer group shadow-lg shadow-cyan-950/30 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 group-hover:scale-105 transition-transform">
+                <Camera className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs sm:text-sm font-bold text-white block group-hover:text-cyan-300 transition-colors">
+                  Screenshot Problem Solver
+                </span>
+                <span className="text-[11px] text-slate-400 block">
+                  Upload analytics/ad/website screenshot for visual diagnosis
+                </span>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-cyan-400 group-hover:translate-x-1 transition-transform shrink-0" />
+          </button>
+        </div>
       </section>
 
       {/* ============================================================== */}

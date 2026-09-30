@@ -5,6 +5,19 @@ import { performRealSeoAudit } from "./src/server/seoCrawler";
 import { generateAICompletion, AIProviderError, normalizeServerErrorMessage } from "./src/server/aiProvider";
 import { performRealResearch, buildVerifiedProspectWorkflow } from "./src/server/researchEngine";
 import { performMultiLinkPresenceAnalysis, detectUrlPlatform } from "./src/server/presenceAnalyzer";
+import { 
+  getAnalyticsIntegrationsStatus, 
+  inspectWebsiteTracking, 
+  inspectYouTubePublic, 
+  inspectStoreListing, 
+  buildRealTrafficDiagnosis 
+} from "./src/server/realTrafficAnalytics";
+import { analyzeBusinessScreenshot } from "./src/server/screenshotAnalyzer";
+import { 
+  generateCustomerAcquisitionPlan, 
+  generateAdsPlan, 
+  generateProblemFixPlan 
+} from "./src/server/problemSolver";
 
 dotenv.config();
 
@@ -19,7 +32,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 // In-Memory IP Rate Limiter (30 requests per minute per IP to protect AI resources)
 const ipRequestCounts = new Map<string, { count: number; resetAt: number }>();
@@ -168,6 +181,158 @@ app.get("/api/health", (_req, res) => {
     hasOpenRouterKey: Boolean(process.env.OPENROUTER_API_KEY),
     timestamp: new Date().toISOString(),
   });
+});
+
+// Real Traffic & Analytics Integration Status
+app.get("/api/analytics/status", (_req, res) => {
+  try {
+    const statuses = getAnalyticsIntegrationsStatus();
+    res.json({ success: true, integrations: statuses });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
+// Live Website Tracking Inspection (GA4, GTM, Search Console tags, robots, sitemap)
+app.post("/api/analytics/website-check", async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url || typeof url !== "string" || !url.trim()) {
+      res.status(400).json({ success: false, error: "Website URL is required." });
+      return;
+    }
+    const trackingSignals = await inspectWebsiteTracking(url.trim());
+    res.json({ success: true, data: trackingSignals });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
+// Live Public YouTube Inspection (Video / Channel)
+app.post("/api/analytics/youtube-inspect", async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url || typeof url !== "string" || !url.trim()) {
+      res.status(400).json({ success: false, error: "YouTube URL is required." });
+      return;
+    }
+    const ytData = await inspectYouTubePublic(url.trim());
+    res.json({ success: true, data: ytData });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
+// Live Public App Store Listing Inspection (Google Play / Apple App Store)
+app.post("/api/analytics/app-inspect", async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url || typeof url !== "string" || !url.trim()) {
+      res.status(400).json({ success: false, error: "App Store or Google Play URL is required." });
+      return;
+    }
+    const appData = await inspectStoreListing(url.trim());
+    res.json({ success: true, data: appData });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
+// Traffic Diagnosis Engine (Strictly real data or "Not connected")
+app.post("/api/analytics/diagnose", (req, res) => {
+  try {
+    const { websiteTracking, gscData, ga4Data, youtubeData } = req.body || {};
+    const diagnosis = buildRealTrafficDiagnosis({
+      websiteTracking: websiteTracking || null,
+      gscData: gscData || null,
+      ga4Data: ga4Data || null,
+      youtubeData: youtubeData || null,
+    });
+    res.json({ success: true, diagnosis });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: String(err) });
+  }
+});
+
+// Multimodal Screenshot & Image Problem Solver
+app.post("/api/ai/analyze-screenshot", async (req, res) => {
+  try {
+    const { imageBase64, imageMimeType, imageType, language, userNotes } = req.body || {};
+    if (!imageBase64 || typeof imageBase64 !== "string") {
+      res.status(400).json({ success: false, error: "Image data (base64) is required." });
+      return;
+    }
+    const analysis = await analyzeBusinessScreenshot({
+      imageBase64,
+      imageMimeType: imageMimeType || "image/png",
+      imageType: imageType || "general",
+      language: language || "English",
+      userNotes: userNotes || "",
+    });
+    res.json({ success: true, analysis });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Customer Acquisition Strategy Solver (Client kaise aayega? / 100 customers)
+app.post("/api/ai/customer-acquisition", async (req, res) => {
+  try {
+    const { query, businessContext, language } = req.body || {};
+    if (!query || typeof query !== "string" || !query.trim()) {
+      res.status(400).json({ success: false, error: "Acquisition query is required." });
+      return;
+    }
+    const plan = await generateCustomerAcquisitionPlan(
+      query.trim(),
+      businessContext || "",
+      language || "English"
+    );
+    res.json({ success: true, plan });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Ads Plan Generator (Google, Meta, Instagram, YouTube)
+app.post("/api/ai/ads-plan", async (req, res) => {
+  try {
+    const { platform, productService, targetLocation, monthlyBudget, language } = req.body || {};
+    if (!productService || !targetLocation) {
+      res.status(400).json({ success: false, error: "Product/Service and target location are required." });
+      return;
+    }
+    const plan = await generateAdsPlan({
+      platform: platform || "Google Ads",
+      productService,
+      targetLocation,
+      monthlyBudget,
+      language: language || "English",
+    });
+    res.json({ success: true, plan });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// End-to-end Problem Fix Action Plan Generator
+app.post("/api/ai/fix-problem", async (req, res) => {
+  try {
+    const { problemTitle, observedData, businessContext, language } = req.body || {};
+    if (!problemTitle) {
+      res.status(400).json({ success: false, error: "Problem title is required." });
+      return;
+    }
+    const fixPlan = await generateProblemFixPlan(
+      problemTitle,
+      observedData || "Not specified",
+      businessContext || "",
+      language || "English"
+    );
+    res.json({ success: true, fixPlan });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
 });
 
 function getProviderSourceName(provider: "gemini" | "groq" | "openrouter"): string {
