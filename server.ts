@@ -671,7 +671,7 @@ app.post("/api/ai/agent-action-execute", async (req, res) => {
       externalExecutionLink = `mailto:?subject=${encodeURIComponent("Business Proposal")}&body=${contentEncoded}`;
       executionNote = "Mailto draft prepared for email client.";
     } else {
-      executionNote = `Deliverable ready for ${targetPlatform || "deployment"}. Approved by business owner.`;
+      executionNote = "Prepared by AI — external execution is not connected. Deliverable copied to clipboard and saved in task history.";
     }
 
     res.json({
@@ -684,6 +684,192 @@ app.post("/api/ai/agent-action-execute", async (req, res) => {
       executionNote,
     });
   } catch (err: unknown) {
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Dedicated Real URL Auto-Detection & Multi-Channel Analysis for Agent
+app.post("/api/ai/agent-url-analyze", async (req, res) => {
+  try {
+    const { url, agentConfig, language = "English" } = req.body || {};
+
+    if (!url || typeof url !== "string" || !url.trim()) {
+      res.status(400).json({ success: false, error: "URL is required for analysis." });
+      return;
+    }
+
+    const cleanUrl = url.trim();
+    const detected = detectUrlPlatform(cleanUrl);
+    const platform = detected.platform;
+
+    let observedData: any = null;
+    let summary = "";
+    let dataLabel: "OBSERVED" | "RESEARCHED" | "NEEDS VERIFICATION" = "OBSERVED";
+    let isConnected = true;
+
+    if (platform === "website") {
+      try {
+        const [audit, tracking] = await Promise.allSettled([
+          performRealSeoAudit(cleanUrl),
+          inspectWebsiteTracking(cleanUrl),
+        ]);
+        observedData = {
+          seoAudit: audit.status === "fulfilled" ? audit.value : null,
+          trackingSignals: tracking.status === "fulfilled" ? tracking.value : null,
+        };
+        summary = `Observed Website: Real SEO Score ${observedData.seoAudit?.score || "N/A"}/100. Title: "${observedData.seoAudit?.title || "Not found"}". Found ${observedData.seoAudit?.suggestions?.length || 0} optimization opportunities.`;
+      } catch (crawlErr) {
+        observedData = { error: String(crawlErr) };
+        summary = "Website could not be accessed or restricted by robots.txt / firewall.";
+        dataLabel = "NEEDS VERIFICATION";
+      }
+    } else if (platform === "youtube_video" || platform === "youtube_channel") {
+      try {
+        const ytData = await inspectYouTubePublic(cleanUrl);
+        observedData = ytData;
+        summary = ytData.isPubliclyAccessible
+          ? `Observed YouTube Resource: "${ytData.title || "Video"}" by ${ytData.authorName || "Channel"}. Status: Publicly Accessible.`
+          : `YouTube resource check: ${ytData.limitationNotice || "Data unavailable"}.`;
+      } catch {
+        observedData = null;
+        summary = "YouTube resource inspection complete: Data is not connected or restricted.";
+        isConnected = false;
+        dataLabel = "NEEDS VERIFICATION";
+      }
+    } else if (platform === "google_play" || platform === "apple_app_store") {
+      try {
+        const appData = await inspectStoreListing(cleanUrl);
+        observedData = appData;
+        summary = `Observed App Listing: "${appData.title || "App"}" (${appData.platform}). Star rating: ${appData.rating || "N/A"}.`;
+      } catch {
+        observedData = null;
+        summary = "App store listing could not be extracted.";
+        isConnected = false;
+        dataLabel = "NEEDS VERIFICATION";
+      }
+    } else if (platform === "instagram" || platform === "google_business") {
+      try {
+        const presence = await performMultiLinkPresenceAnalysis([{ url: cleanUrl, platform }]);
+        observedData = presence;
+        summary = `Public channel evaluation complete. Status: ${presence.analyzed_links?.[0]?.status || "evaluated"}.`;
+      } catch {
+        observedData = null;
+        summary = "Channel public presence check: Data is not connected.";
+        isConnected = false;
+        dataLabel = "NEEDS VERIFICATION";
+      }
+    } else {
+      observedData = null;
+      isConnected = false;
+      summary = "URL type detected, but live API analysis is not currently supported for this private network.";
+      dataLabel = "NEEDS VERIFICATION";
+    }
+
+    res.json({
+      success: true,
+      url: cleanUrl,
+      platform,
+      isConnected,
+      dataLabel,
+      summary,
+      observedData,
+    });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Generate Business Reports for Agent (Business Analysis, SEO, Marketing, Sales, Competitor, etc.)
+app.post("/api/ai/agent-report-generate", async (req, res) => {
+  try {
+    const { 
+      reportType, 
+      agentConfig, 
+      customFocus, 
+      language = "English",
+      userId,
+      userPlan,
+      isAnonymous
+    } = req.body || {};
+
+    if (!reportType) {
+      res.status(400).json({ success: false, error: "Report type is required." });
+      return;
+    }
+
+    if (!agentConfig || !agentConfig.name) {
+      res.status(400).json({ success: false, error: "Agent configuration is required." });
+      return;
+    }
+
+    // Server-side plan limit check
+    const planCheck = verifyPlanLimit({
+      userId,
+      clientPlan: userPlan,
+      isAnonymous,
+      clientIp: req.ip,
+    });
+
+    if (!planCheck.allowed) {
+      res.status(429).json({
+        success: false,
+        error: planCheck.code,
+        message: planCheck.message,
+        limit: planCheck.limit,
+        plan: planCheck.plan,
+      });
+      return;
+    }
+
+    const prompt = `You are a Senior Strategic Business Operations Consultant.
+Generate an exhaustive, highly practical ${reportType} specifically for:
+
+Business Name: ${agentConfig.name}
+Industry: ${agentConfig.industry}
+Location: ${agentConfig.location || "Global"}
+Website: ${agentConfig.website || "Not provided"}
+Products/Services: ${agentConfig.productsServices || "Not provided"}
+Target Customers: ${agentConfig.targetCustomers || "Target audience"}
+Business Goals: ${agentConfig.businessGoals || "Scaling revenue and efficiency"}
+Custom Focus / Owner Notes: ${customFocus || "Full standard executive audit"}
+Language: ${language}
+
+Strict Rules:
+- Support this specific legitimate business context.
+- Be concrete: write real proposed headlines, outreach scripts, pricing tactics, or technical fixes.
+- Distinguish verified facts vs recommended action.
+- Produce pure markdown with clear headings, bullet points, and an Immediate 7-Day Action Plan.`;
+
+    const completion = await generateAICompletion(prompt, {
+      systemPrompt: `You are an expert strategic business consultant. Write thorough, actionable business reports in ${language}.`,
+    });
+
+    // Record usage only on success
+    recordSuccessfulUsage(userId, req.ip);
+
+    const reportId = `report_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const title = `${reportType} — ${agentConfig.name}`;
+    const summary = `Comprehensive ${reportType} generated for ${agentConfig.name} (${agentConfig.industry}) with immediate execution roadmap.`;
+
+    res.json({
+      success: true,
+      report: {
+        id: reportId,
+        agentId: agentConfig.id,
+        userId: userId || "guest",
+        title,
+        type: "business",
+        category: reportType,
+        summary,
+        content: completion.text,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch (err: unknown) {
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
     res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
   }
 });

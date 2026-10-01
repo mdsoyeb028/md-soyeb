@@ -589,27 +589,58 @@ export async function saveBusinessAgent(
   user: User | null
 ): Promise<{ agent: BusinessAgentConfig; isCloud: boolean }> {
   const now = new Date().toISOString();
+  const agentId = agent.id || agent.agentId || `agent_${Date.now()}`;
+  const businessName = agent.businessName || agent.name || "My Business Agent";
+  const country = agent.country || "";
+  const city = agent.city || "";
+  const location = agent.location || (city && country ? `${city}, ${country}` : city || country || "Global");
+
   const agentToSave: BusinessAgentConfig = {
     ...agent,
+    id: agentId,
+    agentId: agentId,
     userId: user ? user.uid : "guest",
+    name: businessName,
+    businessName: businessName,
+    industry: agent.industry || "General Business",
+    country,
+    city,
+    location,
+    website: agent.website || "",
+    productsServices: agent.productsServices || "",
+    targetCustomers: agent.targetCustomers || "",
+    description: agent.description || agent.businessDescription || "",
+    businessDescription: agent.businessDescription || agent.description || "",
+    businessGoals: agent.businessGoals || "",
+    preferredLanguage: agent.preferredLanguage || "Auto / Same as user",
+    brandTone: agent.brandTone || "Professional, direct and helpful",
+    socialUrls: agent.socialUrls || agent.socialLinks || [],
+    socialLinks: agent.socialLinks || agent.socialUrls || [],
+    youtubeLink: agent.youtubeLink || (agent.youtubeLinks && agent.youtubeLinks[0]) || "",
+    youtubeLinks: agent.youtubeLinks || (agent.youtubeLink ? [agent.youtubeLink] : []),
+    appLink: agent.appLink || (agent.appLinks && agent.appLinks[0]) || "",
+    appLinks: agent.appLinks || (agent.appLink ? [agent.appLink] : []),
+    customInstructions: agent.customInstructions || agent.additionalInstructions || "",
+    additionalInstructions: agent.additionalInstructions || agent.customInstructions || "",
+    status: agent.status || "active",
     updatedAt: now,
     createdAt: agent.createdAt || now,
   };
 
   if (user && user.uid) {
-    const docRef = doc(db, "users", user.uid, "agents", agent.id);
+    const docRef = doc(db, "users", user.uid, "agents", agentId);
     try {
       await setDoc(docRef, agentToSave, { merge: true });
       return { agent: agentToSave, isCloud: true };
     } catch (err: unknown) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/agents/${agent.id}`);
+      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/agents/${agentId}`);
       throw err;
     }
   } else {
     try {
       const raw = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
       const existing: BusinessAgentConfig[] = raw ? JSON.parse(raw) : [];
-      const updated = [agentToSave, ...existing.filter((a) => a.id !== agent.id)];
+      const updated = [agentToSave, ...existing.filter((a) => a.id !== agentId)];
       localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(updated));
     } catch (err) {
       console.warn("Guest agent storage write failed:", err);
@@ -635,6 +666,31 @@ export async function deleteBusinessAgent(agentId: string, user: User | null): P
       if (raw) {
         const existing: BusinessAgentConfig[] = JSON.parse(raw);
         localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(existing.filter((a) => a.id !== agentId)));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Delete Agent Task from Firestore or guest storage
+export async function deleteAgentTask(taskId: string, user: User | null): Promise<boolean> {
+  if (user && user.uid) {
+    const docRef = doc(db, "users", user.uid, "tasks", taskId);
+    try {
+      await deleteDoc(docRef);
+      return true;
+    } catch (err: unknown) {
+      handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/tasks/${taskId}`);
+      throw err;
+    }
+  } else {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
+      if (raw) {
+        const existing: AgentActionTask[] = JSON.parse(raw);
+        localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(existing.filter((t) => t.id !== taskId)));
       }
       return true;
     } catch {

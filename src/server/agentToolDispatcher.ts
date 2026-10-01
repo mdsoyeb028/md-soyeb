@@ -318,7 +318,7 @@ Language: ${language}`;
         const plan = await generateAdsPlan({
           platform: args.platform || "Google Ads",
           productService: agentConfig.productsServices || agentConfig.industry,
-          targetLocation: agentConfig.location,
+          targetLocation: agentConfig.location || "Global",
           monthlyBudget: args.budget || "$150 / month",
           language,
         });
@@ -326,7 +326,7 @@ Language: ${language}`;
           tool,
           success: true,
           data: plan,
-          summary: `Advertising campaign drafted for ${args.platform || "Google Ads"} targeting ${agentConfig.location}.`,
+          summary: `Advertising campaign drafted for ${args.platform || "Google Ads"} targeting ${agentConfig.location || "Global"}.`,
           sourceLabel: "PREPARED_BY_AI",
         };
       }

@@ -891,20 +891,32 @@ export interface PricingPlan {
 
 export interface BusinessAgentConfig {
   id: string;
+  agentId?: string;
   userId: string;
   name: string;
+  businessName?: string;
   industry: string;
-  location: string;
+  country?: string;
+  city?: string;
+  location?: string;
   website?: string;
   productsServices?: string;
   targetCustomers?: string;
   description?: string;
+  businessDescription?: string;
   preferredLanguage?: string;
   brandTone?: string;
   socialUrls?: string[];
+  socialLinks?: string[];
+  youtubeLink?: string;
+  youtubeLinks?: string[];
+  appLink?: string;
+  appLinks?: string[];
   businessGoals?: string;
   customInstructions?: string;
+  additionalInstructions?: string;
   isDefault?: boolean;
+  status?: "active" | "paused" | "archived";
   createdAt: string;
   updatedAt: string;
 }

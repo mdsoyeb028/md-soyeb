@@ -33,7 +33,7 @@ service cloud.firestore {
     function isValidAgent(data, userId) {
       return data.userId == userId &&
         data.id is string && data.id.size() <= 128 &&
-        data.name is string && data.name.size() <= 200 &&
+        (data.name is string || data.businessName is string) &&
         data.industry is string;
     }
 
@@ -41,7 +41,7 @@ service cloud.firestore {
       return data.userId == userId &&
         data.id is string && data.id.size() <= 128 &&
         data.title is string && data.title.size() <= 300 &&
-        data.status in ['PREPARED BY AI', 'WAITING FOR APPROVAL', 'EXECUTED', 'COMPLETED', 'FAILED'];
+        data.status in ['TODO', 'IN PROGRESS', 'PREPARED BY AI', 'WAITING FOR APPROVAL', 'EXECUTED', 'COMPLETED', 'FAILED'];
     }
 
     // User profile document
@@ -66,9 +66,34 @@ service cloud.firestore {
         allow update: if isOwner(userId) && isValidAgent(request.resource.data, userId) &&
           request.resource.data.userId == resource.data.userId;
         allow delete: if isOwner(userId);
+
+        // Nested subcollections per agent for complete data isolation
+        match /conversations/{conversationId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        match /tasks/{taskId} {
+          allow get, list: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidTask(request.resource.data, userId);
+          allow update: if isOwner(userId) && isValidTask(request.resource.data, userId) &&
+            request.resource.data.userId == resource.data.userId;
+          allow delete: if isOwner(userId);
+        }
+
+        match /reports/{reportId} {
+          allow get, list: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidReport(request.resource.data, userId);
+          allow update: if isOwner(userId) && isValidReport(request.resource.data, userId) &&
+            request.resource.data.userId == resource.data.userId;
+          allow delete: if isOwner(userId);
+        }
+
+        match /documents/{documentId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
       }
 
-      // Private tasks & external action approvals subcollection
+      // Private tasks & external action approvals subcollection (top-level)
       match /tasks/{taskId} {
         allow get, list: if isOwner(userId);
         allow create: if isOwner(userId) && isValidTask(request.resource.data, userId);
