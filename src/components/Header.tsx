@@ -1,6 +1,6 @@
 import React from "react";
 import { User } from "firebase/auth";
-import { Globe, Bookmark, Sparkles, LogIn, Zap, BarChart3 } from "lucide-react";
+import { Globe, Bookmark, Sparkles, LogIn, Zap, BarChart3, Bot } from "lucide-react";
 import { ActiveTab } from "../types";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
@@ -93,6 +93,21 @@ export const Header: React.FC<HeaderProps> = ({
                 : `AI Credits: ${creditsRemaining}/${dailyLimit} today`
               }
             </span>
+          </button>
+
+          {/* AI Business Agent shortcut */}
+          <button
+            id="nav-agent-btn"
+            onClick={() => setActiveTab("agent")}
+            className={`flex px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border text-xs font-semibold transition-all items-center gap-1 sm:gap-1.5 cursor-pointer ${
+              activeTab === "agent"
+                ? "bg-cyan-500/25 text-cyan-300 border-cyan-500/60 shadow-sm shadow-cyan-500/20"
+                : "bg-slate-900/80 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700"
+            }`}
+            title="AI Business Agent"
+          >
+            <Bot className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[11px] sm:text-xs">AI Agent</span>
           </button>
 
           {/* Traffic & Performance Center shortcut */}

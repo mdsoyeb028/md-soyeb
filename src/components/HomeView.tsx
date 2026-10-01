@@ -38,7 +38,9 @@ import {
   Activity,
   Compass,
   BarChart3,
-  Camera
+  Camera,
+  Bot,
+  Mic
 } from "lucide-react";
 import { 
   ActiveTab, 
@@ -413,8 +415,45 @@ export const HomeView: React.FC<HomeViewProps> = ({
           From zero customers to website leaks, ad campaigns, and sales scripts — we diagnose the root cause, inspect your website, and prepare ready-to-use materials you can copy and paste immediately.
         </p>
 
+        {/* Quick Launch Banner for AI Business Agent */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/90 via-indigo-950/80 to-purple-950/90 border-2 border-cyan-400/50 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left mt-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-400 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-lg shadow-cyan-400/25">
+              <Bot className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs sm:text-sm font-extrabold text-white">AI Business Agent</h4>
+                <span className="px-2 py-0.2 rounded-full bg-cyan-400 text-slate-950 text-[10px] font-black uppercase">NEW</span>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Create an AI agent that understands your business, talks with you, drafts tasks, and saves manual work.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setActiveTab("agent")}
+              className="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-400/20 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
+              <span>Create My AI Agent</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("agent")}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer"
+            >
+              <Mic className="w-3.5 h-3.5" />
+              <span>Talk to AI</span>
+            </button>
+          </div>
+        </div>
+
         {/* Quick Launch Cards for Traffic & Performance + Screenshot Solver */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-left">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 text-left">
           <button
             type="button"
             onClick={() => setActiveTab("traffic")}

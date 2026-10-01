@@ -32,6 +32,9 @@ import {
 } from "./src/server/planEnforcement";
 import { handleAgentVoiceInteraction } from "./src/server/agentVoiceHandler";
 import { generateBusinessAgentProfile } from "./src/server/businessAgentGenerator";
+import { handleAgentChat } from "./src/server/agentChatHandler";
+import { executeAgentTool, SupportedAgentTool } from "./src/server/agentToolDispatcher";
+import { parseBusinessDocument } from "./src/server/documentParser";
 import { CENTRAL_PLANS } from "./src/data/plans";
 
 dotenv.config();
@@ -357,7 +360,7 @@ function getProviderSourceName(provider: "gemini" | "groq" | "openrouter"): stri
 }
 
 // Configurable Plans Configuration Endpoint
-app.get("/api/plans/config", (_req, res) => {
+app.get(["/api/plans", "/api/plans/config"], (_req, res) => {
   res.json({
     success: true,
     plans: CENTRAL_PLANS,
@@ -491,6 +494,196 @@ app.post("/api/ai/agent-voice", async (req, res) => {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
     }
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Interactive Business Agent Chat
+app.post("/api/ai/agent-chat", async (req, res) => {
+  try {
+    const { 
+      message, 
+      agentConfig, 
+      conversationHistory, 
+      attachedDocuments, 
+      analyzedUrlContext,
+      language,
+      userId,
+      userPlan,
+      isAnonymous
+    } = req.body || {};
+
+    if (!message || typeof message !== "string" || !message.trim()) {
+      res.status(400).json({ success: false, error: "Message is required." });
+      return;
+    }
+
+    if (!agentConfig || !agentConfig.name) {
+      res.status(400).json({ success: false, error: "Active business agent configuration is required." });
+      return;
+    }
+
+    // Server-side plan limit check
+    const planCheck = verifyPlanLimit({
+      userId,
+      clientPlan: userPlan,
+      isAnonymous,
+      clientIp: req.ip,
+    });
+
+    if (!planCheck.allowed) {
+      res.status(429).json({
+        success: false,
+        error: planCheck.code,
+        message: planCheck.message,
+        limit: planCheck.limit,
+        plan: planCheck.plan,
+      });
+      return;
+    }
+
+    const chatRes = await handleAgentChat({
+      message: message.trim(),
+      agentConfig,
+      conversationHistory,
+      attachedDocuments,
+      analyzedUrlContext,
+      language,
+    });
+
+    // Record usage only on success
+    recordSuccessfulUsage(userId, req.ip);
+
+    res.json({ success: true, ...chatRes });
+  } catch (err: unknown) {
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Agent Tool Execution
+app.post("/api/ai/agent-tool", async (req, res) => {
+  try {
+    const { 
+      tool, 
+      args, 
+      agentConfig, 
+      language,
+      userId,
+      userPlan,
+      isAnonymous
+    } = req.body || {};
+
+    if (!tool || typeof tool !== "string") {
+      res.status(400).json({ success: false, error: "Tool name is required." });
+      return;
+    }
+
+    // Internal tool calls count as 1 user request or part of the active session
+    const planCheck = verifyPlanLimit({
+      userId,
+      clientPlan: userPlan,
+      isAnonymous,
+      clientIp: req.ip,
+    });
+
+    if (!planCheck.allowed) {
+      res.status(429).json({
+        success: false,
+        error: planCheck.code,
+        message: planCheck.message,
+        limit: planCheck.limit,
+        plan: planCheck.plan,
+      });
+      return;
+    }
+
+    const toolRes = await executeAgentTool({
+      tool: tool as SupportedAgentTool,
+      args: args || {},
+      agentConfig: agentConfig || { name: "Business", industry: "General", location: "Global" },
+      language: language || "English",
+    });
+
+    // Record usage only on success
+    if (toolRes.success) {
+      recordSuccessfulUsage(userId, req.ip);
+    }
+
+    res.json({ success: true, result: toolRes });
+  } catch (err: unknown) {
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Document Upload & Parsing for Agent Context
+app.post("/api/ai/agent-document-parse", async (req, res) => {
+  try {
+    const { name, mimeType, base64Data, rawText, userId } = req.body || {};
+
+    if (!name || (!base64Data && !rawText)) {
+      res.status(400).json({ success: false, error: "Document name and file data are required." });
+      return;
+    }
+
+    const parsed = await parseBusinessDocument({
+      name,
+      mimeType: mimeType || "application/octet-stream",
+      base64Data,
+      rawText,
+    });
+
+    res.json({ success: true, document: parsed });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Action Approval Execution (Transitions: PREPARED BY AI -> WAITING FOR APPROVAL -> EXECUTED -> COMPLETED)
+app.post("/api/ai/agent-action-execute", async (req, res) => {
+  try {
+    const { taskId, actionType, targetPlatform, content, userId } = req.body || {};
+
+    if (!taskId) {
+      res.status(400).json({ success: false, error: "Task ID is required." });
+      return;
+    }
+
+    const executedAt = new Date().toISOString();
+    let externalExecutionLink: string | null = null;
+    let dispatchStatus: "COMPLETED" | "FAILED" = "COMPLETED";
+    let executionNote = "Approved by user and recorded.";
+
+    const platformLower = (targetPlatform || "").toLowerCase();
+    const contentEncoded = encodeURIComponent(content || "");
+
+    if (platformLower.includes("whatsapp")) {
+      externalExecutionLink = `https://api.whatsapp.com/send?text=${contentEncoded}`;
+      executionNote = "WhatsApp intent link prepared. Tap to send in WhatsApp.";
+    } else if (platformLower.includes("email")) {
+      externalExecutionLink = `mailto:?subject=${encodeURIComponent("Business Proposal")}&body=${contentEncoded}`;
+      executionNote = "Mailto draft prepared for email client.";
+    } else {
+      executionNote = `Deliverable ready for ${targetPlatform || "deployment"}. Approved by business owner.`;
+    }
+
+    res.json({
+      success: true,
+      taskId,
+      status: dispatchStatus,
+      lifecycle: "COMPLETED",
+      executedAt,
+      externalExecutionLink,
+      executionNote,
+    });
+  } catch (err: unknown) {
     res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
   }
 });

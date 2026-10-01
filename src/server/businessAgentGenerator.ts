@@ -95,16 +95,14 @@ Return pure JSON matching this exact structure:
   ]
 }`;
 
-  const completion = await generateAICompletion({
-    prompt,
-    temperature: 0.5,
-    maxTokens: 1500,
-    systemInstruction: "You are an AI Business Agent Architect that outputs valid JSON only.",
+  const completion = await generateAICompletion(prompt, {
+    jsonMode: true,
+    systemPrompt: "You are an AI Business Agent Architect that outputs valid JSON only.",
   });
 
   let parsed: any = {};
   try {
-    const cleanJson = completion.content
+    const cleanJson = completion.text
       .replace(/```json/gi, "")
       .replace(/```/g, "")
       .trim();

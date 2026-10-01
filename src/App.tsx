@@ -31,6 +31,7 @@ const BusinessView = lazy(() => import("./components/BusinessView").then(m => ({
 const DashboardView = lazy(() => import("./components/DashboardView").then(m => ({ default: m.DashboardView })));
 const PricingView = lazy(() => import("./components/PricingView").then(m => ({ default: m.PricingView })));
 const TrafficPerformanceView = lazy(() => import("./components/TrafficPerformanceView").then(m => ({ default: m.TrafficPerformanceView })));
+const BusinessAgentCenter = lazy(() => import("./components/BusinessAgentCenter").then(m => ({ default: m.BusinessAgentCenter })));
 
 const AppModals: React.FC<{ setActiveTab: (tab: ActiveTab) => void }> = ({ setActiveTab }) => {
   const { 
@@ -273,8 +274,15 @@ export default function App() {
                   />
                 )}
 
+                {activeTab === "agent" && (
+                  <BusinessAgentCenter
+                    setActiveTab={setActiveTab}
+                    onSaveReport={handleSaveItem}
+                  />
+                )}
+
                 {activeTab === "pricing" && (
-                  <PricingView />
+                  <PricingView setActiveTab={setActiveTab} />
                 )}
               </Suspense>
             </main>

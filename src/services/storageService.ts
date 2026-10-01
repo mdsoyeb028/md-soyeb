@@ -24,7 +24,7 @@ import {
   handleFirestoreError, 
   OperationType 
 } from "../firebase";
-import { SavedItem, SubscriptionPlanId, UserCreditsProfile } from "../types";
+import { SavedItem, SubscriptionPlanId, UserCreditsProfile, BusinessAgentConfig, AgentActionTask, BusinessTask } from "../types";
 import { getDailyLimitForPlan } from "../data/plans";
 
 const LOCAL_STORAGE_KEY = "bge_guest_saved_items";
@@ -574,6 +574,160 @@ export async function deleteReport(reportId: string, user: User | null): Promise
 export function loadGuestReports(): SavedItem[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+const LOCAL_STORAGE_AGENTS_KEY = "bge_guest_business_agents";
+const LOCAL_STORAGE_TASKS_KEY = "bge_guest_agent_tasks";
+
+// Save Business Agent to Firestore or guest storage
+export async function saveBusinessAgent(
+  agent: BusinessAgentConfig,
+  user: User | null
+): Promise<{ agent: BusinessAgentConfig; isCloud: boolean }> {
+  const now = new Date().toISOString();
+  const agentToSave: BusinessAgentConfig = {
+    ...agent,
+    userId: user ? user.uid : "guest",
+    updatedAt: now,
+    createdAt: agent.createdAt || now,
+  };
+
+  if (user && user.uid) {
+    const docRef = doc(db, "users", user.uid, "agents", agent.id);
+    try {
+      await setDoc(docRef, agentToSave, { merge: true });
+      return { agent: agentToSave, isCloud: true };
+    } catch (err: unknown) {
+      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/agents/${agent.id}`);
+      throw err;
+    }
+  } else {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
+      const existing: BusinessAgentConfig[] = raw ? JSON.parse(raw) : [];
+      const updated = [agentToSave, ...existing.filter((a) => a.id !== agent.id)];
+      localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.warn("Guest agent storage write failed:", err);
+    }
+    return { agent: agentToSave, isCloud: false };
+  }
+}
+
+// Delete Business Agent from Firestore or guest storage
+export async function deleteBusinessAgent(agentId: string, user: User | null): Promise<boolean> {
+  if (user && user.uid) {
+    const docRef = doc(db, "users", user.uid, "agents", agentId);
+    try {
+      await deleteDoc(docRef);
+      return true;
+    } catch (err: unknown) {
+      handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/agents/${agentId}`);
+      throw err;
+    }
+  } else {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
+      if (raw) {
+        const existing: BusinessAgentConfig[] = JSON.parse(raw);
+        localStorage.setItem(LOCAL_STORAGE_AGENTS_KEY, JSON.stringify(existing.filter((a) => a.id !== agentId)));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Subscribe to User's Business Agents in Firestore
+export function subscribeToBusinessAgents(
+  userId: string,
+  onUpdate: (agents: BusinessAgentConfig[]) => void
+): () => void {
+  const colRef = collection(db, "users", userId, "agents");
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const agents: BusinessAgentConfig[] = snapshot.docs.map((docSnap) => docSnap.data() as BusinessAgentConfig);
+      onUpdate(agents);
+    },
+    (err) => {
+      console.warn("Failed to subscribe to agents:", err);
+    }
+  );
+}
+
+// Load Guest Business Agents from localStorage
+export function loadGuestBusinessAgents(): BusinessAgentConfig[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Save or Update Agent Task with lifecycle status
+export async function saveAgentTask(
+  task: AgentActionTask,
+  user: User | null
+): Promise<{ task: AgentActionTask; isCloud: boolean }> {
+  const now = new Date().toISOString();
+  const taskToSave: AgentActionTask = {
+    ...task,
+    userId: user ? user.uid : "guest",
+    updatedAt: now,
+    createdAt: task.createdAt || now,
+  };
+
+  if (user && user.uid) {
+    const docRef = doc(db, "users", user.uid, "tasks", task.id);
+    try {
+      await setDoc(docRef, taskToSave, { merge: true });
+      return { task: taskToSave, isCloud: true };
+    } catch (err: unknown) {
+      handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/tasks/${task.id}`);
+      throw err;
+    }
+  } else {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
+      const existing: AgentActionTask[] = raw ? JSON.parse(raw) : [];
+      const updated = [taskToSave, ...existing.filter((t) => t.id !== task.id)];
+      localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.warn("Guest task storage write failed:", err);
+    }
+    return { task: taskToSave, isCloud: false };
+  }
+}
+
+// Subscribe to User's Tasks in Firestore
+export function subscribeToAgentTasks(
+  userId: string,
+  onUpdate: (tasks: AgentActionTask[]) => void
+): () => void {
+  const colRef = collection(db, "users", userId, "tasks");
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const tasks: AgentActionTask[] = snapshot.docs.map((docSnap) => docSnap.data() as AgentActionTask);
+      onUpdate(tasks);
+    },
+    (err) => {
+      console.warn("Failed to subscribe to tasks:", err);
+    }
+  );
+}
+
+// Load Guest Agent Tasks from localStorage
+export function loadGuestAgentTasks(): AgentActionTask[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];

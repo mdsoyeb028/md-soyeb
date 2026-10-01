@@ -1,4 +1,4 @@
-export type ActiveTab = "home" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing";
+export type ActiveTab = "home" | "agent" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing";
 
 export interface SavedItem {
   id: string;
@@ -931,6 +931,38 @@ export interface AgentActionTask {
   executionNotes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type BusinessTaskStatus = "TODO" | "IN PROGRESS" | "WAITING FOR APPROVAL" | "COMPLETED" | "FAILED";
+
+export interface BusinessTask {
+  id: string;
+  userId: string;
+  agentId?: string;
+  title: string;
+  description: string;
+  category: string;
+  status: BusinessTaskStatus;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  preparedContent?: string;
+  requiresApproval?: boolean;
+  approvalStatus?: AgentActionLifecycleStatus;
+  targetPlatform?: string;
+  estimatedCost?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessDocument {
+  id: string;
+  userId: string;
+  agentId?: string;
+  name: string;
+  fileType: "pdf" | "docx" | "txt" | "image" | "other";
+  sizeBytes: number;
+  extractedText: string;
+  summary: string;
+  uploadedAt: string;
 }
 
 // Multi-Link Business Presence Analyzer Types

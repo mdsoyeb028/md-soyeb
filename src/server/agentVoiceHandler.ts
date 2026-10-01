@@ -64,14 +64,11 @@ User Spoke: "${speechText}"
 
 Respond concisely for audio voice playback:`;
 
-  const aiResult = await generateAICompletion({
-    prompt,
-    temperature: 0.6,
-    maxTokens: 300,
-    systemInstruction: "You are an AI Business Voice Agent speaking out loud in conversational dialogue.",
+  const aiResult = await generateAICompletion(prompt, {
+    systemPrompt: "You are an AI Business Voice Agent speaking out loud in conversational dialogue.",
   });
 
-  const spokenClean = aiResult.content
+  const spokenClean = aiResult.text
     .replace(/[*#`_~]/g, "")
     .replace(/\s+/g, " ")
     .trim();
