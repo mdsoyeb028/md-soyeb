@@ -5,6 +5,8 @@ export interface CreateAgentInput {
   name: string;
   industry: string;
   location: string;
+  country?: string;
+  city?: string;
   website?: string;
   productsServices?: string;
   targetCustomers?: string;

@@ -70,6 +70,7 @@ import {
   deleteReport
 } from "../services/storageService";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { safeFetchJson } from "../utils/apiHelper";
 import { AILanguageSelector } from "./AILanguageSelector";
 
 interface BusinessAgentCenterProps {
@@ -386,7 +387,13 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         ? `${formCity.trim()}, ${formCountry.trim()}`
         : formCity.trim() || formCountry.trim() || "Global";
 
-      const res = await fetch("/api/ai/agent-create", {
+      const data = await safeFetchJson<{
+        success: boolean;
+        agent: BusinessAgentConfig;
+        initialSuggestedTasks?: any[];
+        message?: string;
+        error?: string;
+      }>("/api/ai/agent-create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -410,8 +417,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.message || data.error || "Failed to create business agent.");
       }
 
@@ -505,7 +511,16 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
     setIsSendingMessage(true);
 
     try {
-      const res = await fetch("/api/ai/agent-chat", {
+      const data = await safeFetchJson<{
+        success: boolean;
+        replyText: string;
+        response?: string;
+        mode?: string;
+        detectedLanguage?: string;
+        preparedTask?: any;
+        message?: string;
+        error?: string;
+      }>("/api/ai/agent-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -520,8 +535,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.message || data.error || "Agent is temporarily unavailable.");
       }
 
@@ -650,7 +664,13 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
     setVoiceStatus("thinking");
 
     try {
-      const res = await fetch("/api/ai/agent-voice", {
+      const data = await safeFetchJson<{
+        success: boolean;
+        spokenReply: string;
+        detectedEmotionOrIntent?: string;
+        message?: string;
+        error?: string;
+      }>("/api/ai/agent-voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -664,8 +684,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.message || data.error || "Voice processing unavailable.");
       }
 
@@ -695,7 +714,12 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
   const handleApproveAction = async (task: AgentActionTask) => {
     setIsExecutingAction(task.id);
     try {
-      const res = await fetch("/api/ai/agent-action-execute", {
+      const data = await safeFetchJson<{
+        success: boolean;
+        executionNote?: string;
+        externalExecutionLink?: string;
+        error?: string;
+      }>("/api/ai/agent-action-execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -707,8 +731,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.error || "Execution failed.");
       }
 
@@ -751,7 +774,11 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
       const reader = new FileReader();
       reader.onload = async () => {
         const base64Data = (reader.result as string).split(",")[1];
-        const res = await fetch("/api/ai/agent-document-parse", {
+        const data = await safeFetchJson<{
+          success: boolean;
+          document: { fileType: string; extractedText: string; summary: string };
+          error?: string;
+        }>("/api/ai/agent-document-parse", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -762,8 +789,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           }),
         });
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
+        if (!data.success) {
           throw new Error(data.error || "Could not parse document.");
         }
 
@@ -772,7 +798,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           userId: user?.uid || "guest",
           agentId: activeAgent?.id,
           name: file.name,
-          fileType: data.document.fileType,
+          fileType: (data.document.fileType as BusinessDocument["fileType"]) || "other",
           sizeBytes: file.size,
           extractedText: data.document.extractedText,
           summary: data.document.summary,
@@ -798,7 +824,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
     setUrlAnalysisResult(null);
 
     try {
-      const res = await fetch("/api/ai/agent-url-analyze", {
+      const data = await safeFetchJson<any>("/api/ai/agent-url-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -808,7 +834,6 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         }),
       });
 
-      const data = await res.json();
       setUrlAnalysisResult(data);
     } catch (err) {
       setUrlAnalysisResult({ success: false, error: normalizeErrorMessage(err) });
@@ -839,7 +864,11 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
     setImageAnalysisResult(null);
 
     try {
-      const res = await fetch("/api/ai/agent-tool", {
+      const data = await safeFetchJson<{
+        success: boolean;
+        result: any;
+        error?: string;
+      }>("/api/ai/agent-tool", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -858,8 +887,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.error || "Failed to analyze screenshot.");
       }
       setImageAnalysisResult(data.result?.data || data.result);
@@ -884,7 +912,12 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
 
     setIsGeneratingReport(reportType);
     try {
-      const res = await fetch("/api/ai/agent-report-generate", {
+      const data = await safeFetchJson<{
+        success: boolean;
+        report: AgentReportItem;
+        message?: string;
+        error?: string;
+      }>("/api/ai/agent-report-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -898,8 +931,7 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.message || data.error || "Failed to generate report.");
       }
 

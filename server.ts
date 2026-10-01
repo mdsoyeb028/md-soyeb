@@ -373,6 +373,8 @@ app.post("/api/ai/agent-create", async (req, res) => {
     const { 
       name, 
       industry, 
+      country,
+      city,
       location, 
       website, 
       productsServices, 
@@ -412,10 +414,16 @@ app.post("/api/ai/agent-create", async (req, res) => {
       return;
     }
 
+    const locationComputed = city && country 
+      ? `${city}, ${country}` 
+      : city || country || location || "Global";
+
     const generated = await generateBusinessAgentProfile({
       name,
       industry,
-      location: location || "Global",
+      location: locationComputed,
+      country,
+      city,
       website,
       productsServices,
       targetCustomers,

@@ -35,6 +35,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api/[...path]"
+    },
+    {
       "source": "/((?!api/|sitemap\\.xml|robots\\.txt|assets/).*)",
       "destination": "/index.html"
     }
