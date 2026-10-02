@@ -917,6 +917,27 @@ export interface BusinessAgentConfig {
   additionalInstructions?: string;
   isDefault?: boolean;
   status?: "active" | "paused" | "archived";
+  isPublic?: boolean;
+  publicDescription?: string;
+  lastActivityAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  preparedTask?: AgentActionTask;
+  timestamp: string;
+}
+
+export interface AgentConversation {
+  id: string;
+  agentId: string;
+  userId: string;
+  title: string;
+  messages: AgentChatMessage[];
   createdAt: string;
   updatedAt: string;
 }

@@ -24,7 +24,7 @@ import {
   handleFirestoreError, 
   OperationType 
 } from "../firebase";
-import { SavedItem, SubscriptionPlanId, UserCreditsProfile, BusinessAgentConfig, AgentActionTask, BusinessTask } from "../types";
+import { SavedItem, SubscriptionPlanId, UserCreditsProfile, BusinessAgentConfig, AgentActionTask, BusinessTask, AgentConversation } from "../types";
 import { getDailyLimitForPlan } from "../data/plans";
 
 const LOCAL_STORAGE_KEY = "bge_guest_saved_items";
@@ -623,6 +623,9 @@ export async function saveBusinessAgent(
     customInstructions: agent.customInstructions || agent.additionalInstructions || "",
     additionalInstructions: agent.additionalInstructions || agent.customInstructions || "",
     status: agent.status || "active",
+    isPublic: Boolean(agent.isPublic ?? false),
+    publicDescription: agent.publicDescription || "",
+    lastActivityAt: agent.lastActivityAt || now,
     updatedAt: now,
     createdAt: agent.createdAt || now,
   };
@@ -789,3 +792,103 @@ export function loadGuestAgentTasks(): AgentActionTask[] {
     return [];
   }
 }
+
+const LOCAL_STORAGE_CONVERSATIONS_KEY_PREFIX = "bge_guest_convos_";
+
+// Save or Update Agent Conversation
+export async function saveAgentConversation(
+  conversation: AgentConversation,
+  user: User | null
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const convoToSave: AgentConversation = {
+    ...conversation,
+    updatedAt: now,
+    createdAt: conversation.createdAt || now,
+  };
+
+  if (user && user.uid) {
+    const docRef = doc(db, "users", user.uid, "agents", conversation.agentId, "conversations", conversation.id);
+    try {
+      await setDoc(docRef, convoToSave, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn("Firestore conversation write failed:", err);
+      return false;
+    }
+  } else {
+    try {
+      const key = `${LOCAL_STORAGE_CONVERSATIONS_KEY_PREFIX}${conversation.agentId}`;
+      const raw = localStorage.getItem(key);
+      const existing: AgentConversation[] = raw ? JSON.parse(raw) : [];
+      const updated = [convoToSave, ...existing.filter((c) => c.id !== conversation.id)];
+      localStorage.setItem(key, JSON.stringify(updated));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Delete Agent Conversation
+export async function deleteAgentConversation(
+  agentId: string,
+  conversationId: string,
+  user: User | null
+): Promise<boolean> {
+  if (user && user.uid) {
+    const docRef = doc(db, "users", user.uid, "agents", agentId, "conversations", conversationId);
+    try {
+      await deleteDoc(docRef);
+      return true;
+    } catch (err) {
+      console.warn("Firestore conversation delete failed:", err);
+      return false;
+    }
+  } else {
+    try {
+      const key = `${LOCAL_STORAGE_CONVERSATIONS_KEY_PREFIX}${agentId}`;
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const existing: AgentConversation[] = JSON.parse(raw);
+        localStorage.setItem(key, JSON.stringify(existing.filter((c) => c.id !== conversationId)));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Subscribe to Conversations for a specific Agent
+export function subscribeToAgentConversations(
+  userId: string,
+  agentId: string,
+  onUpdate: (convos: AgentConversation[]) => void
+): () => void {
+  const colRef = collection(db, "users", userId, "agents", agentId, "conversations");
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const convos: AgentConversation[] = snapshot.docs.map((docSnap) => docSnap.data() as AgentConversation);
+      // Sort newest first
+      convos.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      onUpdate(convos);
+    },
+    (err) => {
+      console.warn("Failed to subscribe to conversations:", err);
+    }
+  );
+}
+
+// Load Guest Conversations for a specific Agent
+export function loadGuestAgentConversations(agentId: string): AgentConversation[] {
+  try {
+    const key = `${LOCAL_STORAGE_CONVERSATIONS_KEY_PREFIX}${agentId}`;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
