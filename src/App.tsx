@@ -67,7 +67,13 @@ const AppModals: React.FC<{ setActiveTab: (tab: ActiveTab) => void }> = ({ setAc
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
+  const [openAgentCreateModal, setOpenAgentCreateModal] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
+
+  const handleTriggerCreateAgent = () => {
+    setOpenAgentCreateModal(true);
+    setActiveTab("agent");
+  };
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [isReportsLoading, setIsReportsLoading] = useState<boolean>(false);
   const [reportsError, setReportsError] = useState<string | null>(null);
@@ -223,15 +229,17 @@ export default function App() {
               user={user}
               onSignIn={handleSignIn}
               onSignOut={handleSignOut}
+              onCreateAgent={handleTriggerCreateAgent}
             />
 
             {/* Dynamic Mobile View Body */}
-            <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-4xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
+            <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
               {activeTab === "home" && (
                 <HomeView
                   setActiveTab={setActiveTab}
                   onSaveItem={handleSaveItem}
                   savedItemIds={savedItems.map((i) => i.id)}
+                  onCreateAgent={handleTriggerCreateAgent}
                 />
               )}
 
@@ -278,6 +286,7 @@ export default function App() {
                   <BusinessAgentCenter
                     setActiveTab={setActiveTab}
                     onSaveReport={handleSaveItem}
+                    initialOpenCreate={openAgentCreateModal}
                   />
                 )}
 

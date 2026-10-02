@@ -106,6 +106,12 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
   const [showCreateModal, setShowCreateModal] = useState<boolean>(initialOpenCreate);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (initialOpenCreate) {
+      setShowCreateModal(true);
+    }
+  }, [initialOpenCreate]);
+
   // Setup Form State (Create)
   const [formName, setFormName] = useState("");
   const [formIndustry, setFormIndustry] = useState("");
