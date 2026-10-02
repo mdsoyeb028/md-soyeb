@@ -4,10 +4,10 @@ import {
   normalizeServerErrorMessage,
   safeParseJson,
   getProviderSourceName,
-} from "../_lib/aiProvider.ts";
-import { performRealSeoAudit } from "../_lib/seoCrawler.ts";
-import { parseRequestBody, sendJsonResponse } from "../_lib/serverlessHttp.ts";
-import { performRealResearch, buildVerifiedProspectWorkflow } from "../_lib/researchEngine.ts";
+} from "../aiProvider.ts";
+import { performRealSeoAudit } from "../seoCrawler.ts";
+import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
+import { performRealResearch, buildVerifiedProspectWorkflow } from "../researchEngine.ts";
 
 export default async function handler(req: any, res: any) {
   // Handle CORS / preflight requests if needed

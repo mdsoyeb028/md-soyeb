@@ -1,5 +1,5 @@
-import { sendJsonResponse } from "./_lib/serverlessHttp.ts";
-import { CENTRAL_PLANS } from "../src/data/plans.ts";
+import { sendJsonResponse } from "../serverlessHttp.ts";
+import { CENTRAL_PLANS } from "../../data/plans.ts";
 
 export default function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {

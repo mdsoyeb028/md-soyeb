@@ -1,12 +1,12 @@
-import { parseRequestBody, sendJsonResponse } from "../_lib/serverlessHttp.ts";
-import { generateBusinessAgentProfile } from "../../src/server/businessAgentGenerator.ts";
+import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
+import { generateBusinessAgentProfile } from "../businessAgentGenerator.ts";
 import { 
   verifyPlanLimit, 
   recordSuccessfulUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
-} from "../../src/server/planEnforcement.ts";
-import { normalizeServerErrorMessage } from "../../src/server/aiProvider.ts";
+} from "../planEnforcement.ts";
+import { normalizeServerErrorMessage } from "../aiProvider.ts";
 
 export default async function handler(req: any, res: any) {
   // CORS / Preflight handling

@@ -1,12 +1,12 @@
-import { parseRequestBody, sendJsonResponse } from "../_lib/serverlessHttp.ts";
-import { handleAgentChat } from "../../src/server/agentChatHandler.ts";
+import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
+import { handleAgentChat } from "../agentChatHandler.ts";
 import { 
   verifyPlanLimit, 
   recordSuccessfulUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
-} from "../../src/server/planEnforcement.ts";
-import { normalizeServerErrorMessage } from "../../src/server/aiProvider.ts";
+} from "../planEnforcement.ts";
+import { normalizeServerErrorMessage } from "../aiProvider.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {

@@ -1,20 +1,21 @@
-import { sendJsonResponse } from "./_lib/serverlessHttp.ts";
-import agentCreateHandler from "./ai/agent-create.ts";
-import agentChatHandler from "./ai/agent-chat.ts";
-import agentVoiceHandler from "./ai/agent-voice.ts";
-import agentUrlAnalyzeHandler from "./ai/agent-url-analyze.ts";
-import agentReportGenerateHandler from "./ai/agent-report-generate.ts";
-import agentActionExecuteHandler from "./ai/agent-action-execute.ts";
-import agentDocumentParseHandler from "./ai/agent-document-parse.ts";
-import agentToolHandler from "./ai/agent-tool.ts";
-import seoHandler from "./ai/seo.ts";
-import socialHandler from "./ai/social.ts";
-import exportHandler from "./ai/export.ts";
-import businessHandler from "./ai/business.ts";
-import assistantHandler from "./ai/assistant.ts";
-import healthHandler from "./health.ts";
-import plansHandler from "./plans.ts";
-import indexHandler from "./index.ts";
+import { sendJsonResponse } from "../src/server/serverlessHttp.ts";
+import agentCreateHandler from "../src/server/api/agent-create.ts";
+import agentChatHandler from "../src/server/api/agent-chat.ts";
+import agentVoiceHandler from "../src/server/api/agent-voice.ts";
+import agentUrlAnalyzeHandler from "../src/server/api/agent-url-analyze.ts";
+import agentReportGenerateHandler from "../src/server/api/agent-report-generate.ts";
+import agentActionExecuteHandler from "../src/server/api/agent-action-execute.ts";
+import agentDocumentParseHandler from "../src/server/api/agent-document-parse.ts";
+import agentToolHandler from "../src/server/api/agent-tool.ts";
+import seoHandler from "../src/server/api/seo.ts";
+import socialHandler from "../src/server/api/social.ts";
+import exportHandler from "../src/server/api/export.ts";
+import businessHandler from "../src/server/api/business.ts";
+import assistantHandler from "../src/server/api/assistant.ts";
+import presenceAnalyzerHandler from "../src/server/api/presence-analyzer.ts";
+import healthHandler from "../src/server/api/health.ts";
+import plansHandler from "../src/server/api/plans.ts";
+import indexHandler from "../src/server/api/index.ts";
 
 function extractCleanPath(req: any): string {
   // Check req.query.path if Vercel populated catch-all query parameter
@@ -100,6 +101,9 @@ export default async function handler(req: any, res: any) {
 
       case "/ai/assistant":
         return await assistantHandler(req, res);
+
+      case "/ai/presence-analyzer":
+        return await presenceAnalyzerHandler(req, res);
 
       // System & Pricing Endpoints
       case "/health":

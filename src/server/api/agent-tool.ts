@@ -1,12 +1,12 @@
-import { parseRequestBody, sendJsonResponse } from "../_lib/serverlessHttp.ts";
-import { handleAgentVoiceInteraction } from "../../src/server/agentVoiceHandler.ts";
+import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
+import { executeAgentTool, SupportedAgentTool } from "../agentToolDispatcher.ts";
 import { 
   verifyPlanLimit, 
   recordSuccessfulUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
-} from "../../src/server/planEnforcement.ts";
-import { normalizeServerErrorMessage } from "../../src/server/aiProvider.ts";
+} from "../planEnforcement.ts";
+import { normalizeServerErrorMessage } from "../aiProvider.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -32,17 +32,17 @@ export default async function handler(req: any, res: any) {
   try {
     const body = await parseRequestBody(req);
     const { 
-      speechText, 
+      tool, 
+      args, 
       agentConfig, 
-      conversationHistory, 
       language,
       userId,
       userPlan,
       isAnonymous
     } = body || {};
 
-    if (!speechText || typeof speechText !== "string" || !speechText.trim()) {
-      sendJsonResponse(res, 400, { success: false, error: "Spoken text is required." });
+    if (!tool || typeof tool !== "string") {
+      sendJsonResponse(res, 400, { success: false, error: "Tool name is required." });
       return;
     }
 
@@ -68,20 +68,26 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const voiceRes = await handleAgentVoiceInteraction({
-      speechText: speechText.trim(),
-      agentConfig,
-      conversationHistory,
+    const toolRes = await executeAgentTool({
+      tool: tool as SupportedAgentTool,
+      args: args || {},
+      agentConfig: agentConfig || { name: "Business", industry: "General", location: "Global" },
       language: language || "English",
     });
 
-    // Record usage on success
-    recordSuccessfulUsage(userId, clientIp);
+    // Record usage only on success
+    if (toolRes.success) {
+      recordSuccessfulUsage(userId, clientIp);
+    }
 
-    sendJsonResponse(res, 200, { success: true, ...voiceRes });
+    sendJsonResponse(res, 200, { success: true, result: toolRes });
   } catch (err: unknown) {
     if (isProviderQuotaError(err)) {
-      sendJsonResponse(res, 429, { success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      sendJsonResponse(res, 429, {
+        success: false,
+        error: "provider_quota_reached",
+        message: getProviderQuotaErrorMessage(),
+      });
       return;
     }
     sendJsonResponse(res, 500, { success: false, error: normalizeServerErrorMessage(err) });

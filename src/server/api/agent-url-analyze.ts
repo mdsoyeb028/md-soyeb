@@ -1,15 +1,15 @@
-import { parseRequestBody, sendJsonResponse } from "../_lib/serverlessHttp.ts";
-import { performRealSeoAudit } from "../../src/server/seoCrawler.ts";
+import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
+import { performRealSeoAudit } from "../seoCrawler.ts";
 import { 
   inspectWebsiteTracking, 
   inspectYouTubePublic, 
   inspectStoreListing 
-} from "../../src/server/realTrafficAnalytics.ts";
+} from "../realTrafficAnalytics.ts";
 import { 
   performMultiLinkPresenceAnalysis, 
   detectUrlPlatform 
-} from "../../src/server/presenceAnalyzer.ts";
-import { normalizeServerErrorMessage } from "../../src/server/aiProvider.ts";
+} from "../presenceAnalyzer.ts";
+import { normalizeServerErrorMessage } from "../aiProvider.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {

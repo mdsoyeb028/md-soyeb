@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { performMultiLinkPresenceAnalysis } from "../_lib/presenceAnalyzer.ts";
-import { normalizeServerErrorMessage } from "../_lib/aiProvider.ts";
+import { performMultiLinkPresenceAnalysis } from "../presenceAnalyzer.ts";
+import { normalizeServerErrorMessage } from "../aiProvider.ts";
 
 export default async function handler(req: Request, res: Response) {
   if (req.method !== "POST") {

@@ -914,7 +914,16 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
     try {
       const data = await safeFetchJson<{
         success: boolean;
-        report: AgentReportItem;
+        report: {
+          id: string;
+          title: string;
+          type: string;
+          category: string;
+          summary: string;
+          content: string;
+          createdAt: string;
+          isSaved?: boolean;
+        };
         message?: string;
         error?: string;
       }>("/api/ai/agent-report-generate", {

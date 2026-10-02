@@ -1,4 +1,4 @@
-import { sendJsonResponse } from "./_lib/serverlessHttp.ts";
+import { sendJsonResponse } from "../serverlessHttp.ts";
 
 export default function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -15,15 +15,9 @@ export default function handler(req: any, res: any) {
 
   sendJsonResponse(res, 200, {
     status: "ok",
-    service: "Business Growth & Export Hub API",
-    endpoints: [
-      "/api/ai/assistant",
-      "/api/ai/seo",
-      "/api/ai/social",
-      "/api/ai/export",
-      "/api/ai/business",
-      "/api/health",
-    ],
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasGroqKey: Boolean(process.env.GROQ_API_KEY),
+    hasOpenRouterKey: Boolean(process.env.OPENROUTER_API_KEY),
     timestamp: new Date().toISOString(),
   });
 }
