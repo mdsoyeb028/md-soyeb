@@ -1,4 +1,4 @@
-import { generateAICompletion } from "./aiProvider";
+import { generateAICompletion } from "./aiProvider.ts";
 
 export interface ChannelAcquisitionComparison {
   channel: string;

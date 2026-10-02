@@ -1,7 +1,7 @@
-import { generateAICompletion } from "./aiProvider";
-import { BusinessAgentConfig, BusinessDocument, AgentActionTask } from "../types";
-import { detectLanguage, resolveTargetLanguage, detectIntent } from "./intentAndLanguageDetector";
-import { handleConversationalResponse } from "./conversationalHandler";
+import { generateAICompletion } from "./aiProvider.ts";
+import { BusinessAgentConfig, BusinessDocument, AgentActionTask } from "../types.ts";
+import { detectLanguage, resolveTargetLanguage, detectIntent } from "./intentAndLanguageDetector.ts";
+import { handleConversationalResponse } from "./conversationalHandler.ts";
 
 export interface AgentChatRequest {
   message: string;

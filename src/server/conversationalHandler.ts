@@ -1,5 +1,5 @@
-import { generateAICompletion } from "./aiProvider";
-import { UserIntent, LanguageDetectionResult } from "./intentAndLanguageDetector";
+import { generateAICompletion } from "./aiProvider.ts";
+import { UserIntent, LanguageDetectionResult } from "./intentAndLanguageDetector.ts";
 
 export interface ConversationalResponse {
   mode: "conversational" | "business_problem";

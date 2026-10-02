@@ -1,7 +1,7 @@
 import dns from "dns/promises";
 import { parse } from "node-html-parser";
-import { performRealSeoAudit } from "./seoCrawler";
-import { generateAICompletion } from "./aiProvider";
+import { performRealSeoAudit } from "./seoCrawler.ts";
+import { generateAICompletion } from "./aiProvider.ts";
 import { 
   BusinessUrlPlatform, 
   MultiPresenceAnalysisResult, 
@@ -13,7 +13,7 @@ import {
   AppStoreReport,
   UnifiedMultiChannelDiagnosis,
   ReliabilityItem
-} from "../types";
+} from "../types.ts";
 
 export interface LinkToAnalyze {
   url: string;

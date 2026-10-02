@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getGeminiKey, getGroqKey, getOpenRouterKey, sanitizeString } from "./aiProvider";
+import { getGeminiKey, getGroqKey, getOpenRouterKey, sanitizeString } from "./aiProvider.ts";
 
 export interface VisualAnnotation {
   id: string;

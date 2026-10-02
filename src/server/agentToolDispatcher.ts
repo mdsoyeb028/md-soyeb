@@ -1,20 +1,20 @@
-import { performRealSeoAudit } from "./seoCrawler";
-import { performRealResearch } from "./researchEngine";
-import { performMultiLinkPresenceAnalysis } from "./presenceAnalyzer";
+import { performRealSeoAudit } from "./seoCrawler.ts";
+import { performRealResearch } from "./researchEngine.ts";
+import { performMultiLinkPresenceAnalysis } from "./presenceAnalyzer.ts";
 import { 
   inspectWebsiteTracking, 
   inspectYouTubePublic, 
   inspectStoreListing, 
   buildRealTrafficDiagnosis 
-} from "./realTrafficAnalytics";
-import { analyzeBusinessScreenshot } from "./screenshotAnalyzer";
+} from "./realTrafficAnalytics.ts";
+import { analyzeBusinessScreenshot } from "./screenshotAnalyzer.ts";
 import { 
   generateCustomerAcquisitionPlan, 
   generateAdsPlan, 
   generateProblemFixPlan 
-} from "./problemSolver";
-import { generateAICompletion } from "./aiProvider";
-import { BusinessAgentConfig } from "../types";
+} from "./problemSolver.ts";
+import { generateAICompletion } from "./aiProvider.ts";
+import { BusinessAgentConfig } from "../types.ts";
 
 export type SupportedAgentTool =
   | "analyzeWebsite"

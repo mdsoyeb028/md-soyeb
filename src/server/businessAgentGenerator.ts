@@ -1,5 +1,5 @@
-import { generateAICompletion } from "./aiProvider";
-import { BusinessAgentConfig, AgentActionTask } from "../types";
+import { generateAICompletion } from "./aiProvider.ts";
+import { BusinessAgentConfig, AgentActionTask } from "../types.ts";
 
 export interface CreateAgentInput {
   name: string;

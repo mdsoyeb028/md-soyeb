@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { getGeminiKey, getGroqKey, getOpenRouterKey } from "./aiProvider";
+import { getGeminiKey, getGroqKey, getOpenRouterKey } from "./aiProvider.ts";
 
 export interface ParsedDocumentResult {
   name: string;

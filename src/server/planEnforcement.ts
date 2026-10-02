@@ -1,5 +1,5 @@
-import { SubscriptionPlanId } from "../types";
-import { CENTRAL_PLANS, getDailyLimitForPlan } from "../data/plans";
+import { SubscriptionPlanId } from "../types.ts";
+import { CENTRAL_PLANS, getDailyLimitForPlan } from "../data/plans.ts";
 
 export interface PlanVerificationResult {
   allowed: boolean;

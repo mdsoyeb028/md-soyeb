@@ -1,5 +1,5 @@
-import { generateAICompletion } from "./aiProvider";
-import { BusinessAgentConfig } from "../types";
+import { generateAICompletion } from "./aiProvider.ts";
+import { BusinessAgentConfig } from "../types.ts";
 
 export interface AgentVoiceRequest {
   speechText: string;

@@ -1,41 +1,41 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { performRealSeoAudit } from "./src/server/seoCrawler";
-import { generateAICompletion, AIProviderError, normalizeServerErrorMessage } from "./src/server/aiProvider";
-import { performRealResearch, buildVerifiedProspectWorkflow } from "./src/server/researchEngine";
-import { performMultiLinkPresenceAnalysis, detectUrlPlatform } from "./src/server/presenceAnalyzer";
+import { performRealSeoAudit } from "./src/server/seoCrawler.ts";
+import { generateAICompletion, AIProviderError, normalizeServerErrorMessage } from "./src/server/aiProvider.ts";
+import { performRealResearch, buildVerifiedProspectWorkflow } from "./src/server/researchEngine.ts";
+import { performMultiLinkPresenceAnalysis, detectUrlPlatform } from "./src/server/presenceAnalyzer.ts";
 import { 
   getAnalyticsIntegrationsStatus, 
   inspectWebsiteTracking, 
   inspectYouTubePublic, 
   inspectStoreListing, 
   buildRealTrafficDiagnosis 
-} from "./src/server/realTrafficAnalytics";
-import { analyzeBusinessScreenshot } from "./src/server/screenshotAnalyzer";
+} from "./src/server/realTrafficAnalytics.ts";
+import { analyzeBusinessScreenshot } from "./src/server/screenshotAnalyzer.ts";
 import { 
   generateCustomerAcquisitionPlan, 
   generateAdsPlan, 
   generateProblemFixPlan 
-} from "./src/server/problemSolver";
+} from "./src/server/problemSolver.ts";
 import { 
   detectLanguage, 
   resolveTargetLanguage, 
   detectIntent 
-} from "./src/server/intentAndLanguageDetector";
-import { handleConversationalResponse } from "./src/server/conversationalHandler";
+} from "./src/server/intentAndLanguageDetector.ts";
+import { handleConversationalResponse } from "./src/server/conversationalHandler.ts";
 import { 
   verifyPlanLimit, 
   recordSuccessfulUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
-} from "./src/server/planEnforcement";
-import { handleAgentVoiceInteraction } from "./src/server/agentVoiceHandler";
-import { generateBusinessAgentProfile } from "./src/server/businessAgentGenerator";
-import { handleAgentChat } from "./src/server/agentChatHandler";
-import { executeAgentTool, SupportedAgentTool } from "./src/server/agentToolDispatcher";
-import { parseBusinessDocument } from "./src/server/documentParser";
-import { CENTRAL_PLANS } from "./src/data/plans";
+} from "./src/server/planEnforcement.ts";
+import { handleAgentVoiceInteraction } from "./src/server/agentVoiceHandler.ts";
+import { generateBusinessAgentProfile } from "./src/server/businessAgentGenerator.ts";
+import { handleAgentChat } from "./src/server/agentChatHandler.ts";
+import { executeAgentTool, SupportedAgentTool } from "./src/server/agentToolDispatcher.ts";
+import { parseBusinessDocument } from "./src/server/documentParser.ts";
+import { CENTRAL_PLANS } from "./src/data/plans.ts";
 
 dotenv.config();
 
