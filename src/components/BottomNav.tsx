@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, Bot, Search, CheckCircle2, FileText } from "lucide-react";
+import { Home, Bot, Search, CheckCircle2, FileText, Layers } from "lucide-react";
 import { ActiveTab } from "../types";
 
 interface BottomNavProps {
@@ -7,13 +7,15 @@ interface BottomNavProps {
   setActiveTab: (tab: ActiveTab) => void;
   onNavigateSection?: (section: "home" | "chat" | "analyze" | "tasks" | "reports") => void;
   currentSection?: string;
+  onOpenAllTools?: () => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ 
   activeTab, 
   setActiveTab, 
   onNavigateSection,
-  currentSection = "home"
+  currentSection = "home",
+  onOpenAllTools,
 }) => {
   const tabs = [
     { id: "nav-home", label: "Home", icon: Home, isHome: true },
@@ -21,6 +23,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     { id: "nav-analyze", label: "Analyze", icon: Search, section: "analyze" as const },
     { id: "nav-tasks", label: "Tasks", icon: CheckCircle2, section: "tasks" as const },
     { id: "nav-reports", label: "Reports", icon: FileText, section: "reports" as const },
+    { id: "nav-all-tools", label: "Tools", icon: Layers, isToolsButton: true },
   ];
 
   return (
@@ -33,6 +36,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           const Icon = tab.icon;
           const isActive = tab.isHome 
             ? activeTab === "home" 
+            : tab.isToolsButton
+            ? false
             : activeTab === "agent" && (currentSection === tab.section || (tab.section === "home" && (currentSection === "home" || currentSection === "chat")));
 
           return (
@@ -40,7 +45,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               key={tab.id}
               id={`bottom-tab-${tab.id}`}
               onClick={() => {
-                if (tab.isHome) {
+                if (tab.isToolsButton && onOpenAllTools) {
+                  onOpenAllTools();
+                } else if (tab.isHome) {
                   setActiveTab("home");
                 } else if (onNavigateSection && tab.section) {
                   onNavigateSection(tab.section);
@@ -49,7 +56,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   setActiveTab("agent");
                 }
               }}
-              className={`relative flex flex-col items-center justify-center py-1 px-2 rounded-xl min-w-[56px] transition-all duration-200 cursor-pointer ${
+              className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl min-w-[50px] transition-all duration-200 cursor-pointer ${
                 isActive
                   ? "text-cyan-400 font-semibold"
                   : "text-slate-400 hover:text-slate-200"

@@ -33,6 +33,8 @@ const PricingView = lazy(() => import("./components/PricingView").then(m => ({ d
 const TrafficPerformanceView = lazy(() => import("./components/TrafficPerformanceView").then(m => ({ default: m.TrafficPerformanceView })));
 const BusinessAgentCenter = lazy(() => import("./components/BusinessAgentCenter").then(m => ({ default: m.BusinessAgentCenter })));
 const PublicAgentView = lazy(() => import("./components/PublicAgentView").then(m => ({ default: m.PublicAgentView })));
+const MultiLinkPresenceAnalyzer = lazy(() => import("./components/MultiLinkPresenceAnalyzer").then(m => ({ default: m.MultiLinkPresenceAnalyzer })));
+import { DashboardSidebar } from "./components/DashboardSidebar";
 
 const AppModals: React.FC<{ setActiveTab: (tab: ActiveTab) => void }> = ({ setActiveTab }) => {
   const { 
@@ -100,6 +102,16 @@ export default function App() {
   const isEmbedMode = Boolean(
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embed") === "true"
   );
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
+  const handleSidebarNavigate = (tab: ActiveTab, section?: any) => {
+    setActiveTab(tab);
+    if (section) {
+      setAgentSection(section);
+    }
+  };
 
   const handleExitPublicAgent = () => {
     setPublicAgentId(null);
@@ -275,90 +287,126 @@ export default function App() {
                 onSignIn={handleSignIn}
                 onSignOut={handleSignOut}
                 onCreateAgent={handleTriggerCreateAgent}
+                onOpenTools={() => setIsMobileSidebarOpen(true)}
               />
             )}
 
-            {/* Dynamic Mobile View Body */}
-            <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
-              {publicAgentId ? (
-                <Suspense fallback={
-                  <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
-                    <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
-                    <span className="text-xs">Loading public agent...</span>
-                  </div>
-                }>
-                  <PublicAgentView
-                    agentId={publicAgentId}
-                    onBackToApp={handleExitPublicAgent}
+            {/* Mobile Drawer when on Homepage */}
+            {activeTab === "home" && isMobileSidebarOpen && (
+              <DashboardSidebar
+                activeTab={activeTab}
+                currentSection={agentSection}
+                onNavigate={handleSidebarNavigate}
+                isCollapsed={isSidebarCollapsed}
+                onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+                isMobileOpen={isMobileSidebarOpen}
+                onCloseMobile={() => setIsMobileSidebarOpen(false)}
+              />
+            )}
+
+            {/* Dynamic View Body / Dashboard Layout */}
+            {activeTab === "home" ? (
+              <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
+                <HomeView
+                  setActiveTab={setActiveTab}
+                  onSaveItem={handleSaveItem}
+                  savedItemIds={savedItems.map((i) => i.id)}
+                  onCreateAgent={handleTriggerCreateAgent}
+                />
+              </main>
+            ) : (
+              <div className="flex-1 flex w-full max-w-7xl mx-auto relative">
+                {/* Desktop Collapsible Sidebar & Mobile Slide-Over Drawer */}
+                {!publicAgentId && (
+                  <DashboardSidebar
+                    activeTab={activeTab}
+                    currentSection={agentSection}
+                    onNavigate={handleSidebarNavigate}
+                    isCollapsed={isSidebarCollapsed}
+                    onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+                    isMobileOpen={isMobileSidebarOpen}
+                    onCloseMobile={() => setIsMobileSidebarOpen(false)}
                   />
-                </Suspense>
-              ) : (
-                <>
-                  {activeTab === "home" && (
-                    <HomeView
-                      setActiveTab={setActiveTab}
-                      onSaveItem={handleSaveItem}
-                      savedItemIds={savedItems.map((i) => i.id)}
-                      onCreateAgent={handleTriggerCreateAgent}
-                    />
+                )}
+
+                <main className="flex-1 min-w-0 px-3.5 sm:px-6 pt-3 pb-24">
+                  {publicAgentId ? (
+                    <Suspense fallback={
+                      <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
+                        <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                        <span className="text-xs">Loading public agent...</span>
+                      </div>
+                    }>
+                      <PublicAgentView
+                        agentId={publicAgentId}
+                        onBackToApp={handleExitPublicAgent}
+                      />
+                    </Suspense>
+                  ) : (
+                    <Suspense fallback={
+                      <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
+                        <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                        <span className="text-xs">Loading workspace module...</span>
+                      </div>
+                    }>
+                      {activeTab === "agent" && (
+                        <BusinessAgentCenter
+                          setActiveTab={setActiveTab}
+                          onSaveReport={handleSaveItem}
+                          initialOpenCreate={openAgentCreateModal}
+                          initialSection={agentSection}
+                          onSectionChanged={(sec) => setAgentSection(sec)}
+                        />
+                      )}
+
+                      {activeTab === "traffic" && (
+                        <TrafficPerformanceView onSaveItem={handleSaveItem} />
+                      )}
+
+                      {activeTab === "seo" && (
+                        <SeoView onSaveItem={handleSaveItem} />
+                      )}
+
+                      {activeTab === "social" && (
+                        <SocialView onSaveItem={handleSaveItem} />
+                      )}
+
+                      {activeTab === "export" && (
+                        <ExportView onSaveItem={handleSaveItem} />
+                      )}
+
+                      {activeTab === "business" && (
+                        <BusinessView onSaveItem={handleSaveItem} setActiveTab={setActiveTab} />
+                      )}
+
+                      {activeTab === "analysis" && (
+                        <MultiLinkPresenceAnalyzer 
+                          onSaveReport={handleSaveItem} 
+                          savedItemIds={savedItems.map((i) => i.id)} 
+                        />
+                      )}
+
+                      {activeTab === "dashboard" && (
+                        <DashboardView
+                          savedItems={savedItems}
+                          user={user}
+                          isLoading={isReportsLoading}
+                          error={reportsError}
+                          onDeleteItem={handleDeleteItem}
+                          onSignIn={handleSignIn}
+                          onSignOut={handleSignOut}
+                          setActiveTab={setActiveTab}
+                        />
+                      )}
+
+                      {activeTab === "pricing" && (
+                        <PricingView setActiveTab={setActiveTab} />
+                      )}
+                    </Suspense>
                   )}
-
-                  <Suspense fallback={
-                    <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
-                      <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
-                      <span className="text-xs">Loading growth tools...</span>
-                    </div>
-                  }>
-                    {activeTab === "traffic" && (
-                      <TrafficPerformanceView onSaveItem={handleSaveItem} />
-                    )}
-
-                    {activeTab === "seo" && (
-                      <SeoView onSaveItem={handleSaveItem} />
-                    )}
-
-                    {activeTab === "social" && (
-                      <SocialView onSaveItem={handleSaveItem} />
-                    )}
-
-                    {activeTab === "export" && (
-                      <ExportView onSaveItem={handleSaveItem} />
-                    )}
-
-                    {activeTab === "business" && (
-                      <BusinessView onSaveItem={handleSaveItem} setActiveTab={setActiveTab} />
-                    )}
-
-                    {activeTab === "dashboard" && (
-                      <DashboardView
-                        savedItems={savedItems}
-                        user={user}
-                        isLoading={isReportsLoading}
-                        error={reportsError}
-                        onDeleteItem={handleDeleteItem}
-                        onSignIn={handleSignIn}
-                        onSignOut={handleSignOut}
-                        setActiveTab={setActiveTab}
-                      />
-                    )}
-
-                    {activeTab === "agent" && (
-                      <BusinessAgentCenter
-                        setActiveTab={setActiveTab}
-                        onSaveReport={handleSaveItem}
-                        initialOpenCreate={openAgentCreateModal}
-                        initialSection={agentSection}
-                        onSectionChanged={(sec) => setAgentSection(sec)}
-                      />
-                    )}
-
-                    {activeTab === "pricing" && (
-                      <PricingView setActiveTab={setActiveTab} />
-                    )}
-                  </Suspense>
-                </>
-              )}
-            </main>
+                </main>
+              </div>
+            )}
 
             {/* Global Modals for Signup Gate & Credits Quota */}
             <AppModals setActiveTab={setActiveTab} />
@@ -391,6 +439,7 @@ export default function App() {
                   setActiveTab("agent");
                 }}
                 currentSection={agentSection}
+                onOpenAllTools={() => setIsMobileSidebarOpen(true)}
               />
             )}
           </div>

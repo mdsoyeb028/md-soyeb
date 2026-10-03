@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { User } from "firebase/auth";
-import { Bot, Sparkles, LogIn, Zap, Menu, X, ArrowRight, Shield } from "lucide-react";
+import { Bot, Sparkles, LogIn, Zap, Menu, X, ArrowRight, Shield, Layers } from "lucide-react";
 import { ActiveTab } from "../types";
 import { useCredits } from "../context/CreditsContext";
 
@@ -12,6 +12,7 @@ interface HeaderProps {
   onSignIn?: () => void;
   onSignOut?: () => void;
   onCreateAgent?: () => void;
+  onOpenTools?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSignIn,
   onSignOut,
   onCreateAgent,
+  onOpenTools,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { 
@@ -107,6 +109,19 @@ export const Header: React.FC<HeaderProps> = ({
           >
             Pricing
           </button>
+          {onOpenTools && (
+            <button
+              onClick={onOpenTools}
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer py-1 px-2 rounded-lg ${
+                activeTab !== "home" && activeTab !== "pricing"
+                  ? "text-cyan-400 font-bold bg-slate-900 border border-cyan-500/30"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span>All Tools & OS</span>
+            </button>
+          )}
         </nav>
 
         {/* Right side controls: Credits / Login / Create Agent */}
@@ -193,6 +208,21 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Mobile Dropdown Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden mt-3 pt-3 border-t border-slate-800/80 flex flex-col gap-2 pb-2">
+          {onOpenTools && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenTools();
+              }}
+              className="text-left px-3 py-2 rounded-lg text-sm text-cyan-300 font-semibold bg-cyan-950/40 border border-cyan-800/40 flex items-center justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-cyan-400" />
+                <span>All 25 Tools & Modules</span>
+              </span>
+              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-cyan-900/60 text-cyan-200">OS</span>
+            </button>
+          )}
           <button
             onClick={() => handleNavClick("product")}
             className="text-left px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800/50"
