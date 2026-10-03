@@ -90,6 +90,8 @@ interface BusinessAgentCenterProps {
   setActiveTab: (tab: ActiveTab) => void;
   onSaveReport?: (item: Omit<SavedItem, "id" | "createdAt">) => void;
   initialOpenCreate?: boolean;
+  initialSection?: AgentSection;
+  onSectionChanged?: (section: AgentSection) => void;
 }
 
 export type AgentSection = 
@@ -108,12 +110,30 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
   setActiveTab,
   onSaveReport,
   initialOpenCreate = false,
+  initialSection,
+  onSectionChanged,
 }) => {
-  const { user, isAnonymous, plan, canPerformAIAction, consumeCredit, openSignupModal, openLimitModal } = useCredits();
+  const { 
+    user, 
+    isAnonymous, 
+    plan, 
+    consultationsUsed, 
+    dailyLimit, 
+    canPerformAIAction, 
+    consumeCredit, 
+    openSignupModal, 
+    openLimitModal 
+  } = useCredits();
   const { languageInfo } = useLanguage();
 
-  // Navigation inside Agent Dashboard: default to Agent Home
-  const [activeSection, setActiveSection] = useState<AgentSection>("home");
+  // Navigation inside Agent Dashboard: default to Agent Home or initialSection
+  const [activeSection, setActiveSection] = useState<AgentSection>(initialSection || "home");
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection]);
 
   // Agents Collection & Active Agent
   const [agents, setAgents] = useState<BusinessAgentConfig[]>([]);
@@ -684,6 +704,70 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
       setCreateError(normalizeErrorMessage(err, "Could not generate business agent."));
     } finally {
       setIsCreatingAgent(false);
+    }
+  };
+
+  // Open Edit Agent Modal
+  const openEditAgentModal = () => {
+    if (!activeAgent) return;
+    setEditName(activeAgent.name || activeAgent.businessName || "");
+    setEditIndustry(activeAgent.industry || "");
+    setEditCountry(activeAgent.country || "");
+    setEditCity(activeAgent.city || "");
+    setEditWebsite(activeAgent.website || "");
+    setEditProducts(activeAgent.productsServices || "");
+    setEditCustomers(activeAgent.targetCustomers || "");
+    setEditDescription(activeAgent.description || activeAgent.businessDescription || "");
+    setEditGoals(activeAgent.businessGoals || "");
+    setEditLanguage(activeAgent.preferredLanguage || "Auto / English");
+    setEditBrandTone(activeAgent.brandTone || "Professional, warm & direct");
+    setEditSocialUrl(activeAgent.socialUrls?.[0] || "");
+    setEditYoutubeUrl(activeAgent.youtubeLink || activeAgent.youtubeLinks?.[0] || "");
+    setEditAppUrl(activeAgent.appLink || activeAgent.appLinks?.[0] || "");
+    setEditInstructions(activeAgent.customInstructions || activeAgent.additionalInstructions || "");
+    setEditSuccessNotice(null);
+    setShowEditModal(true);
+  };
+
+  // Save Edit Agent Context
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeAgent || !editName.trim() || !editIndustry.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      const locationComputed = [editCity.trim(), editCountry.trim()].filter(Boolean).join(", ") || activeAgent.location || "Global";
+      const updated: BusinessAgentConfig = {
+        ...activeAgent,
+        name: editName.trim(),
+        businessName: editName.trim(),
+        industry: editIndustry.trim(),
+        country: editCountry.trim(),
+        city: editCity.trim(),
+        location: locationComputed,
+        website: editWebsite.trim(),
+        productsServices: editProducts.trim(),
+        targetCustomers: editCustomers.trim(),
+        description: editDescription.trim(),
+        businessDescription: editDescription.trim(),
+        businessGoals: editGoals.trim(),
+        preferredLanguage: editLanguage.trim() || "Auto / English",
+        brandTone: editBrandTone.trim() || "Professional, warm & direct",
+        socialUrls: [editSocialUrl, editYoutubeUrl, editAppUrl].filter(Boolean),
+        youtubeLink: editYoutubeUrl.trim(),
+        appLink: editAppUrl.trim(),
+        customInstructions: editInstructions.trim(),
+        additionalInstructions: editInstructions.trim(),
+        updatedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+      };
+      await saveBusinessAgent(updated, user);
+      setAgents((prev) => prev.map((a) => (a.id === activeAgent.id ? updated : a)));
+      showToast(`Business memory updated for "${updated.name}"!`, "success");
+      setShowEditModal(false);
+    } catch {
+      showToast("Could not save changes.", "warning");
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -3290,9 +3374,12 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
                     />
                   </div>
 
-                  {/* Public Agent Link */}
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                    <span className="font-bold text-white block">Public Agent Link</span>
+                  {/* Deploy to Website: YOUR AGENT */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white uppercase text-[11px] tracking-wider block">YOUR AGENT</span>
+                      <span className="text-[10px] text-cyan-400 font-mono">Public URL</span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
@@ -3308,17 +3395,20 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
                           setTimeout(() => setShowPublicLinkCopied(false), 2500);
                           showToast("Public link copied to clipboard!", "success");
                         }}
-                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-500/20 whitespace-nowrap"
                       >
-                        {showPublicLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{showPublicLinkCopied ? "Copied" : "Copy Link"}</span>
+                        {showPublicLinkCopied ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5 text-slate-950" />}
+                        <span>Copy Public Link</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Website Embed Code */}
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                    <span className="font-bold text-white block">Website Embed Code (iFrame Widget)</span>
+                  {/* Deploy to Website: WEBSITE WIDGET */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white uppercase text-[11px] tracking-wider block">WEBSITE WIDGET</span>
+                      <span className="text-[10px] text-emerald-400 font-mono">iFrame Ready</span>
+                    </div>
                     <p className="text-[11px] text-slate-400">
                       Paste this snippet into your HTML before the closing &lt;/body&gt; tag to embed your agent.
                     </p>
@@ -3335,12 +3425,12 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
                           navigator.clipboard.writeText(`<iframe src="${window.location.origin}/?publicAgent=${activeAgent.id}" width="100%" height="600" style="border:none;border-radius:16px;"></iframe>`);
                           setShowEmbedCodeCopied(true);
                           setTimeout(() => setShowEmbedCodeCopied(false), 2500);
-                          showToast("Embed snippet copied!", "success");
+                          showToast("Embed code copied to clipboard!", "success");
                         }}
-                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs flex items-center gap-1.5 cursor-pointer self-start"
+                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs flex items-center gap-1.5 cursor-pointer self-start whitespace-nowrap"
                       >
                         {showEmbedCodeCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Code className="w-3.5 h-3.5" />}
-                        <span>{showEmbedCodeCopied ? "Copied" : "Copy Embed"}</span>
+                        <span>Copy Embed Code</span>
                       </button>
                     </div>
                   </div>

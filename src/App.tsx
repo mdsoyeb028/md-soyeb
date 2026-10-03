@@ -68,6 +68,7 @@ const AppModals: React.FC<{ setActiveTab: (tab: ActiveTab) => void }> = ({ setAc
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [openAgentCreateModal, setOpenAgentCreateModal] = useState<boolean>(false);
+  const [agentSection, setAgentSection] = useState<"home" | "chat" | "voice" | "analyze" | "tasks" | "reports" | "context" | "documents" | "agents" | "settings">("home");
   const [user, setUser] = useState<User | null>(null);
 
   const handleTriggerCreateAgent = () => {
@@ -287,6 +288,8 @@ export default function App() {
                     setActiveTab={setActiveTab}
                     onSaveReport={handleSaveItem}
                     initialOpenCreate={openAgentCreateModal}
+                    initialSection={agentSection}
+                    onSectionChanged={(sec) => setAgentSection(sec)}
                   />
                 )}
 
@@ -318,7 +321,15 @@ export default function App() {
             )}
 
             {/* Bottom Fixed Navigation Bar */}
-            <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+            <BottomNav 
+              activeTab={activeTab} 
+              setActiveTab={setActiveTab} 
+              onNavigateSection={(sec) => {
+                setAgentSection(sec);
+                setActiveTab("agent");
+              }}
+              currentSection={agentSection}
+            />
           </div>
         </div>
       </CreditsProvider>
