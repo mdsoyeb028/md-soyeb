@@ -44,6 +44,22 @@ service cloud.firestore {
         data.status in ['TODO', 'IN PROGRESS', 'PREPARED BY AI', 'WAITING FOR APPROVAL', 'EXECUTED', 'COMPLETED', 'FAILED'];
     }
 
+    function isValidPublicAgent(data) {
+      return data.isPublic == true &&
+        data.id is string && data.id.size() <= 128 &&
+        (data.name is string || data.businessName is string) &&
+        data.industry is string;
+    }
+
+    // Controlled Public Agents collection (only explicitly approved public info displayed)
+    match /public_agents/{agentId} {
+      allow get: if resource.data.isPublic == true;
+      allow list: if false; // prevent directory scraping
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidPublicAgent(request.resource.data);
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
     // User profile document
     match /users/{userId} {
       allow get, list: if isOwner(userId);

@@ -1,4 +1,4 @@
-export type ActiveTab = "home" | "agent" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing";
+export type ActiveTab = "home" | "agent" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing" | "analysis";
 
 export interface SavedItem {
   id: string;

@@ -7,6 +7,7 @@ import {
   query, 
   orderBy, 
   getDocs,
+  getDoc,
   getDocFromServer
 } from "firebase/firestore";
 import { 
@@ -634,6 +635,41 @@ export async function saveBusinessAgent(
     const docRef = doc(db, "users", user.uid, "agents", agentId);
     try {
       await setDoc(docRef, agentToSave, { merge: true });
+
+      // Synchronize controlled public collection if enabled
+      const publicDocRef = doc(db, "public_agents", agentId);
+      if (agentToSave.isPublic) {
+        // Only explicitly approved public fields are written
+        const publicSafeData = {
+          id: agentId,
+          agentId: agentId,
+          userId: user.uid,
+          name: agentToSave.name,
+          businessName: agentToSave.businessName,
+          industry: agentToSave.industry,
+          country: agentToSave.country || "",
+          city: agentToSave.city || "",
+          location: agentToSave.location || "Global",
+          website: agentToSave.website || "",
+          productsServices: agentToSave.productsServices || "",
+          description: agentToSave.publicDescription || agentToSave.description || "",
+          publicDescription: agentToSave.publicDescription || agentToSave.description || "",
+          preferredLanguage: agentToSave.preferredLanguage || "English",
+          brandTone: agentToSave.brandTone || "Professional, direct and helpful",
+          isPublic: true,
+          updatedAt: now,
+          createdAt: agentToSave.createdAt || now,
+        };
+        await setDoc(publicDocRef, publicSafeData, { merge: true });
+      } else {
+        // If made private, remove from public_agents immediately
+        try {
+          await deleteDoc(publicDocRef);
+        } catch {
+          // ignore if document was not previously public
+        }
+      }
+
       return { agent: agentToSave, isCloud: true };
     } catch (err: unknown) {
       handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/agents/${agentId}`);
@@ -658,6 +694,12 @@ export async function deleteBusinessAgent(agentId: string, user: User | null): P
     const docRef = doc(db, "users", user.uid, "agents", agentId);
     try {
       await deleteDoc(docRef);
+      try {
+        const publicDocRef = doc(db, "public_agents", agentId);
+        await deleteDoc(publicDocRef);
+      } catch {
+        // ignore
+      }
       return true;
     } catch (err: unknown) {
       handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}/agents/${agentId}`);
@@ -675,6 +717,39 @@ export async function deleteBusinessAgent(agentId: string, user: User | null): P
       return false;
     }
   }
+}
+
+// Controlled Public Agent Retrieval (returns public agent config or null)
+export async function getPublicBusinessAgent(agentId: string): Promise<BusinessAgentConfig | null> {
+  if (!agentId) return null;
+
+  // 1. Check guest local storage (for owner testing link locally)
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_AGENTS_KEY);
+    if (raw) {
+      const all: BusinessAgentConfig[] = JSON.parse(raw);
+      const found = all.find((a) => (a.id === agentId || a.agentId === agentId) && a.isPublic);
+      if (found) return found;
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. Fetch from Firestore public_agents collection
+  try {
+    const docRef = doc(db, "public_agents", agentId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && data.isPublic) {
+        return data as BusinessAgentConfig;
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to fetch public agent from Firestore:", err);
+  }
+
+  return null;
 }
 
 // Delete Agent Task from Firestore or guest storage

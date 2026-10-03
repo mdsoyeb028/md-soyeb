@@ -32,6 +32,7 @@ const DashboardView = lazy(() => import("./components/DashboardView").then(m => 
 const PricingView = lazy(() => import("./components/PricingView").then(m => ({ default: m.PricingView })));
 const TrafficPerformanceView = lazy(() => import("./components/TrafficPerformanceView").then(m => ({ default: m.TrafficPerformanceView })));
 const BusinessAgentCenter = lazy(() => import("./components/BusinessAgentCenter").then(m => ({ default: m.BusinessAgentCenter })));
+const PublicAgentView = lazy(() => import("./components/PublicAgentView").then(m => ({ default: m.PublicAgentView })));
 
 const AppModals: React.FC<{ setActiveTab: (tab: ActiveTab) => void }> = ({ setActiveTab }) => {
   const { 
@@ -83,6 +84,33 @@ export default function App() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<"success" | "info" | "warning">("success");
+
+  // Public Agent page / widget query detection
+  const [publicAgentId, setPublicAgentId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const q = urlParams.get("publicAgent");
+      if (q) return q;
+      const match = window.location.pathname.match(/^\/agent\/([^/?#]+)/);
+      if (match) return match[1];
+    }
+    return null;
+  });
+
+  const isEmbedMode = Boolean(
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embed") === "true"
+  );
+
+  const handleExitPublicAgent = () => {
+    setPublicAgentId(null);
+    if (typeof window !== "undefined" && window.history?.pushState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("publicAgent");
+      url.searchParams.delete("embed");
+      window.history.pushState({}, "", url.pathname + (url.search ? url.search : ""));
+    }
+    setActiveTab("agent");
+  };
 
   // Boot connection check & Auth subscription
   useEffect(() => {
@@ -208,6 +236,21 @@ export default function App() {
     }, 3200);
   };
 
+  if (publicAgentId && isEmbedMode) {
+    return (
+      <div className="min-h-screen bg-[#060913] text-slate-100 flex flex-col justify-center items-center p-2">
+        <Suspense fallback={
+          <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+            <span className="text-xs">Loading assistant...</span>
+          </div>
+        }>
+          <PublicAgentView agentId={publicAgentId} isEmbed={true} />
+        </Suspense>
+      </div>
+    );
+  }
+
   return (
     <LanguageProvider user={user}>
       <CreditsProvider
@@ -223,80 +266,98 @@ export default function App() {
           {/* Main Container Layout */}
           <div className="relative z-10 flex flex-col min-h-screen">
             {/* Header Bar */}
-            <Header
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              savedCount={savedItems.length}
-              user={user}
-              onSignIn={handleSignIn}
-              onSignOut={handleSignOut}
-              onCreateAgent={handleTriggerCreateAgent}
-            />
+            {!publicAgentId && (
+              <Header
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                savedCount={savedItems.length}
+                user={user}
+                onSignIn={handleSignIn}
+                onSignOut={handleSignOut}
+                onCreateAgent={handleTriggerCreateAgent}
+              />
+            )}
 
             {/* Dynamic Mobile View Body */}
             <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
-              {activeTab === "home" && (
-                <HomeView
-                  setActiveTab={setActiveTab}
-                  onSaveItem={handleSaveItem}
-                  savedItemIds={savedItems.map((i) => i.id)}
-                  onCreateAgent={handleTriggerCreateAgent}
-                />
+              {publicAgentId ? (
+                <Suspense fallback={
+                  <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
+                    <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                    <span className="text-xs">Loading public agent...</span>
+                  </div>
+                }>
+                  <PublicAgentView
+                    agentId={publicAgentId}
+                    onBackToApp={handleExitPublicAgent}
+                  />
+                </Suspense>
+              ) : (
+                <>
+                  {activeTab === "home" && (
+                    <HomeView
+                      setActiveTab={setActiveTab}
+                      onSaveItem={handleSaveItem}
+                      savedItemIds={savedItems.map((i) => i.id)}
+                      onCreateAgent={handleTriggerCreateAgent}
+                    />
+                  )}
+
+                  <Suspense fallback={
+                    <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
+                      <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                      <span className="text-xs">Loading growth tools...</span>
+                    </div>
+                  }>
+                    {activeTab === "traffic" && (
+                      <TrafficPerformanceView onSaveItem={handleSaveItem} />
+                    )}
+
+                    {activeTab === "seo" && (
+                      <SeoView onSaveItem={handleSaveItem} />
+                    )}
+
+                    {activeTab === "social" && (
+                      <SocialView onSaveItem={handleSaveItem} />
+                    )}
+
+                    {activeTab === "export" && (
+                      <ExportView onSaveItem={handleSaveItem} />
+                    )}
+
+                    {activeTab === "business" && (
+                      <BusinessView onSaveItem={handleSaveItem} setActiveTab={setActiveTab} />
+                    )}
+
+                    {activeTab === "dashboard" && (
+                      <DashboardView
+                        savedItems={savedItems}
+                        user={user}
+                        isLoading={isReportsLoading}
+                        error={reportsError}
+                        onDeleteItem={handleDeleteItem}
+                        onSignIn={handleSignIn}
+                        onSignOut={handleSignOut}
+                        setActiveTab={setActiveTab}
+                      />
+                    )}
+
+                    {activeTab === "agent" && (
+                      <BusinessAgentCenter
+                        setActiveTab={setActiveTab}
+                        onSaveReport={handleSaveItem}
+                        initialOpenCreate={openAgentCreateModal}
+                        initialSection={agentSection}
+                        onSectionChanged={(sec) => setAgentSection(sec)}
+                      />
+                    )}
+
+                    {activeTab === "pricing" && (
+                      <PricingView setActiveTab={setActiveTab} />
+                    )}
+                  </Suspense>
+                </>
               )}
-
-              <Suspense fallback={
-                <div className="flex flex-col items-center justify-center min-h-[300px] text-slate-400 gap-3">
-                  <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
-                  <span className="text-xs">Loading growth tools...</span>
-                </div>
-              }>
-                {activeTab === "traffic" && (
-                  <TrafficPerformanceView onSaveItem={handleSaveItem} />
-                )}
-
-                {activeTab === "seo" && (
-                  <SeoView onSaveItem={handleSaveItem} />
-                )}
-
-                {activeTab === "social" && (
-                  <SocialView onSaveItem={handleSaveItem} />
-                )}
-
-                {activeTab === "export" && (
-                  <ExportView onSaveItem={handleSaveItem} />
-                )}
-
-                {activeTab === "business" && (
-                  <BusinessView onSaveItem={handleSaveItem} setActiveTab={setActiveTab} />
-                )}
-
-                {activeTab === "dashboard" && (
-                  <DashboardView
-                    savedItems={savedItems}
-                    user={user}
-                    isLoading={isReportsLoading}
-                    error={reportsError}
-                    onDeleteItem={handleDeleteItem}
-                    onSignIn={handleSignIn}
-                    onSignOut={handleSignOut}
-                    setActiveTab={setActiveTab}
-                  />
-                )}
-
-                {activeTab === "agent" && (
-                  <BusinessAgentCenter
-                    setActiveTab={setActiveTab}
-                    onSaveReport={handleSaveItem}
-                    initialOpenCreate={openAgentCreateModal}
-                    initialSection={agentSection}
-                    onSectionChanged={(sec) => setAgentSection(sec)}
-                  />
-                )}
-
-                {activeTab === "pricing" && (
-                  <PricingView setActiveTab={setActiveTab} />
-                )}
-              </Suspense>
             </main>
 
             {/* Global Modals for Signup Gate & Credits Quota */}
@@ -321,15 +382,17 @@ export default function App() {
             )}
 
             {/* Bottom Fixed Navigation Bar */}
-            <BottomNav 
-              activeTab={activeTab} 
-              setActiveTab={setActiveTab} 
-              onNavigateSection={(sec) => {
-                setAgentSection(sec);
-                setActiveTab("agent");
-              }}
-              currentSection={agentSection}
-            />
+            {!publicAgentId && (
+              <BottomNav 
+                activeTab={activeTab} 
+                setActiveTab={setActiveTab} 
+                onNavigateSection={(sec) => {
+                  setAgentSection(sec);
+                  setActiveTab("agent");
+                }}
+                currentSection={agentSection}
+              />
+            )}
           </div>
         </div>
       </CreditsProvider>
