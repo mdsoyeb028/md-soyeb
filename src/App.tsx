@@ -80,6 +80,11 @@ export default function App() {
     setOpenAgentCreateModal(true);
     setActiveTab("agent");
   };
+
+  const handleTriggerCreateCustomerAgent = () => {
+    setCustomerAgentSection("overview");
+    setActiveTab("customer-agent");
+  };
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [isReportsLoading, setIsReportsLoading] = useState<boolean>(false);
   const [reportsError, setReportsError] = useState<string | null>(null);
@@ -312,12 +317,13 @@ export default function App() {
 
             {/* Dynamic View Body / Dashboard Layout */}
             {activeTab === "home" ? (
-              <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
+              <main className="flex-1 w-full max-w-md sm:max-w-2xl lg:max-w-6xl mx-auto px-3.5 sm:px-6 pt-3 pb-24">
                 <HomeView
                   setActiveTab={setActiveTab}
                   onSaveItem={handleSaveItem}
                   savedItemIds={savedItems.map((i) => i.id)}
                   onCreateAgent={handleTriggerCreateAgent}
+                  onCreateCustomerAgent={handleTriggerCreateCustomerAgent}
                 />
               </main>
             ) : (
