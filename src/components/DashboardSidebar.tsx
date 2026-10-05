@@ -32,7 +32,15 @@ import {
   PanelLeftClose,
   PanelLeft,
   X,
-  Sparkles
+  Sparkles,
+  MessageSquare,
+  PhoneCall,
+  UserCheck,
+  MessageCircle,
+  Calendar,
+  BookOpen,
+  UserX,
+  Link2
 } from "lucide-react";
 import { ActiveTab } from "../types";
 
@@ -60,6 +68,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   // Category expanded state (defaults open for active section)
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
     agent: true,
+    customerAgent: true,
     tools: true,
     analysis: true,
     reports: true,
@@ -87,6 +96,26 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         { id: "agents", label: "Manage Agents", icon: Layers, tab: "agent" as ActiveTab, section: "agents" },
         { id: "documents", label: "Knowledge / Documents", icon: FileCheck, tab: "agent" as ActiveTab, section: "documents" },
         { id: "settings", label: "Agent Settings", icon: SettingsIcon, tab: "agent" as ActiveTab, section: "settings" },
+      ],
+    },
+    {
+      id: "customerAgent",
+      title: "AI CUSTOMER AGENT",
+      icon: Users,
+      items: [
+        { id: "cust-overview", label: "Overview", icon: Users, tab: "customer-agent" as ActiveTab, section: "overview" },
+        { id: "cust-chat", label: "AI Chat Agent", icon: MessageSquare, tab: "customer-agent" as ActiveTab, section: "chat" },
+        { id: "cust-voice", label: "AI Voice Agent", icon: PhoneCall, tab: "customer-agent" as ActiveTab, section: "voice" },
+        { id: "cust-website", label: "Website Agent", icon: Globe, tab: "customer-agent" as ActiveTab, section: "website" },
+        { id: "cust-leads", label: "Lead Management", icon: UserCheck, tab: "customer-agent" as ActiveTab, section: "leads" },
+        { id: "cust-conversations", label: "Conversations", icon: MessageCircle, tab: "customer-agent" as ActiveTab, section: "conversations" },
+        { id: "cust-appointments", label: "Appointments", icon: Calendar, tab: "customer-agent" as ActiveTab, section: "appointments" },
+        { id: "cust-knowledge", label: "Knowledge Base", icon: BookOpen, tab: "customer-agent" as ActiveTab, section: "knowledge" },
+        { id: "cust-automations", label: "Automations", icon: Zap, tab: "customer-agent" as ActiveTab, section: "automations" },
+        { id: "cust-handoff", label: "Human Handoff", icon: UserX, tab: "customer-agent" as ActiveTab, section: "handoff" },
+        { id: "cust-settings", label: "Agent Settings", icon: SettingsIcon, tab: "customer-agent" as ActiveTab, section: "settings" },
+        { id: "cust-analytics", label: "Usage & Analytics", icon: BarChart3, tab: "customer-agent" as ActiveTab, section: "analytics" },
+        { id: "cust-integrations", label: "Integrations", icon: Link2, tab: "customer-agent" as ActiveTab, section: "integrations" },
       ],
     },
     {
@@ -160,6 +189,9 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     if (item.tab !== activeTab) return false;
     if (item.tab === "agent") {
       return (item.section || "home") === currentSection;
+    }
+    if (item.tab === "customer-agent") {
+      return (item.section || "overview") === currentSection;
     }
     return true;
   };

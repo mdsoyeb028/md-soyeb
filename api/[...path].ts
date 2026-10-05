@@ -16,6 +16,8 @@ import presenceAnalyzerHandler from "../src/server/api/presence-analyzer.ts";
 import healthHandler from "../src/server/api/health.ts";
 import plansHandler from "../src/server/api/plans.ts";
 import indexHandler from "../src/server/api/index.ts";
+import customerAgentChatHandler from "../src/server/api/customer-agent-chat.ts";
+import customerAgentVoiceHandler from "../src/server/api/customer-agent-voice.ts";
 
 function extractCleanPath(req: any): string {
   // Check req.query.path if Vercel populated catch-all query parameter
@@ -85,6 +87,13 @@ export default async function handler(req: any, res: any) {
 
       case "/ai/agent-tool":
         return await agentToolHandler(req, res);
+
+      // AI Customer Agent Endpoints
+      case "/ai/customer-agent-chat":
+        return await customerAgentChatHandler(req, res);
+
+      case "/ai/customer-agent-voice":
+        return await customerAgentVoiceHandler(req, res);
 
       // Core Strategic Tools Endpoints
       case "/ai/seo":

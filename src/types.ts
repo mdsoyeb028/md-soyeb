@@ -1,4 +1,4 @@
-export type ActiveTab = "home" | "agent" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing" | "analysis";
+export type ActiveTab = "home" | "agent" | "customer-agent" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing" | "analysis";
 
 export interface SavedItem {
   id: string;
@@ -1257,5 +1257,146 @@ export interface ScreenshotAnalysisResult {
     metricToMonitor: string;
   }>;
   disclaimer: string;
+}
+
+// ==========================================
+// REAL AI CUSTOMER AGENT / AI EMPLOYEE TYPES
+// ==========================================
+
+export type CustomerLeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "BOOKED" | "WON" | "LOST";
+export type CustomerAppointmentStatus = "REQUESTED" | "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+export type CustomerConversationStatus = "AI HANDLED" | "HUMAN HANDLED" | "WAITING FOR HUMAN" | "UNRESOLVED";
+export type KnowledgeProcessingState = "UPLOADING" | "PROCESSING" | "READY" | "FAILED";
+export type IntegrationStatus = "CONNECTED" | "NOT CONNECTED" | "COMING SOON" | "REQUIRES SETUP";
+
+export interface CustomerLead {
+  id: string;
+  agentId: string;
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  requirement: string;
+  serviceOrProduct?: string;
+  source: "website_widget" | "voice" | "direct_chat" | "manual";
+  status: CustomerLeadStatus;
+  notes?: string;
+  assignedTo?: string;
+  conversationId?: string;
+  createdAt: string;
+  lastContactAt: string;
+}
+
+export interface CustomerAppointment {
+  id: string;
+  agentId: string;
+  userId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  service: string;
+  preferredDate: string;
+  preferredTime: string;
+  notes?: string;
+  status: CustomerAppointmentStatus;
+  calendarEventId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerKnowledgeItem {
+  id: string;
+  agentId: string;
+  userId: string;
+  title: string;
+  type: "faq" | "pricing" | "policy" | "product" | "service" | "document" | "hours" | "location";
+  content: string;
+  state: KnowledgeProcessingState;
+  fileUrl?: string;
+  fileName?: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface CustomerConversationMessage {
+  id: string;
+  role: "customer" | "agent" | "human_agent" | "system";
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CustomerConversation {
+  id: string;
+  agentId: string;
+  userId: string;
+  channel: "website_widget" | "voice" | "whatsapp" | "email" | "messenger";
+  customerName?: string;
+  customerContact?: string;
+  messages: CustomerConversationMessage[];
+  leadStatus?: CustomerLeadStatus;
+  resolutionStatus: CustomerConversationStatus;
+  lastMessageSnippet: string;
+  humanHandoffRequested: boolean;
+  handoffReason?: string;
+  leadId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerAutomationRule {
+  id: string;
+  agentId: string;
+  userId: string;
+  name: string;
+  trigger: "new_lead" | "human_requested" | "appointment_requested" | "lead_qualified" | "unknown_question";
+  action: "notify_owner" | "create_escalation" | "create_appointment_request" | "create_followup_task" | "create_review_task";
+  enabled: boolean;
+  target?: string;
+  createdAt: string;
+}
+
+export interface CustomerIntegrationConfig {
+  id: string;
+  agentId: string;
+  channel: "website" | "telephony" | "whatsapp" | "email" | "google_calendar" | "crm" | "instagram" | "messenger";
+  status: IntegrationStatus;
+  label: string;
+  details?: string;
+  config?: Record<string, string>;
+  updatedAt: string;
+}
+
+export interface CustomerAgentConfig {
+  id: string;
+  agentId: string;
+  userId: string;
+  enabled: boolean;
+  agentName: string;
+  businessName: string;
+  welcomeMessage: string;
+  businessDescription: string;
+  brandColor: string;
+  logoUrl?: string;
+  tone: string;
+  language: string;
+  voiceGender: "female" | "male" | "neutral";
+  voiceSpeed?: number;
+  greetingText?: string;
+  workingHoursText?: string;
+  locationText?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  bookingEnabled: boolean;
+  leadCaptureEnabled: boolean;
+  humanHandoffEnabled: boolean;
+  handoffKeywords?: string[];
+  publicWidgetEnabled: boolean;
+  widgetPosition: "bottom-right" | "bottom-left";
+  suggestedQuestions: string[];
+  isTelephonyConnected: boolean;
+  isCalendarConnected: boolean;
+  updatedAt: string;
+  createdAt: string;
 }
 

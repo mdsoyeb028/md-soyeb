@@ -32,6 +32,7 @@ const DashboardView = lazy(() => import("./components/DashboardView").then(m => 
 const PricingView = lazy(() => import("./components/PricingView").then(m => ({ default: m.PricingView })));
 const TrafficPerformanceView = lazy(() => import("./components/TrafficPerformanceView").then(m => ({ default: m.TrafficPerformanceView })));
 const BusinessAgentCenter = lazy(() => import("./components/BusinessAgentCenter").then(m => ({ default: m.BusinessAgentCenter })));
+const CustomerAgentCenter = lazy(() => import("./components/CustomerAgentCenter").then(m => ({ default: m.CustomerAgentCenter })));
 const PublicAgentView = lazy(() => import("./components/PublicAgentView").then(m => ({ default: m.PublicAgentView })));
 const MultiLinkPresenceAnalyzer = lazy(() => import("./components/MultiLinkPresenceAnalyzer").then(m => ({ default: m.MultiLinkPresenceAnalyzer })));
 import { DashboardSidebar } from "./components/DashboardSidebar";
@@ -72,6 +73,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [openAgentCreateModal, setOpenAgentCreateModal] = useState<boolean>(false);
   const [agentSection, setAgentSection] = useState<"home" | "chat" | "voice" | "analyze" | "tasks" | "reports" | "context" | "documents" | "agents" | "settings">("home");
+  const [customerAgentSection, setCustomerAgentSection] = useState<any>("overview");
   const [user, setUser] = useState<User | null>(null);
 
   const handleTriggerCreateAgent = () => {
@@ -109,7 +111,11 @@ export default function App() {
   const handleSidebarNavigate = (tab: ActiveTab, section?: any) => {
     setActiveTab(tab);
     if (section) {
-      setAgentSection(section);
+      if (tab === "customer-agent") {
+        setCustomerAgentSection(section);
+      } else {
+        setAgentSection(section);
+      }
     }
   };
 
@@ -320,7 +326,7 @@ export default function App() {
                 {!publicAgentId && (
                   <DashboardSidebar
                     activeTab={activeTab}
-                    currentSection={agentSection}
+                    currentSection={activeTab === "customer-agent" ? customerAgentSection : agentSection}
                     onNavigate={handleSidebarNavigate}
                     isCollapsed={isSidebarCollapsed}
                     onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
@@ -356,6 +362,14 @@ export default function App() {
                           initialOpenCreate={openAgentCreateModal}
                           initialSection={agentSection}
                           onSectionChanged={(sec) => setAgentSection(sec)}
+                        />
+                      )}
+
+                      {activeTab === "customer-agent" && (
+                        <CustomerAgentCenter
+                          initialSection={customerAgentSection}
+                          onSectionChanged={(sec) => setCustomerAgentSection(sec)}
+                          setActiveTab={setActiveTab}
                         />
                       )}
 

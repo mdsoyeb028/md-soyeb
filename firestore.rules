@@ -60,6 +60,15 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
+    // Controlled Public Customer Agents collection for website widgets (strictly approved public branding)
+    match /public_customer_agents/{agentId} {
+      allow get: if resource.data.enabled == true;
+      allow list: if false; // prevent directory scraping
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
     // User profile document
     match /users/{userId} {
       allow get, list: if isOwner(userId);
@@ -105,6 +114,35 @@ service cloud.firestore {
         }
 
         match /documents/{documentId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        // AI Customer Agent subcollections for the business owner
+        match /customerAgent/{docId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        match /customerLeads/{leadId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        match /customerAppointments/{appointmentId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        match /customerConversations/{conversationId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        match /customerKnowledge/{knowledgeId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        match /customerAutomations/{automationId} {
+          allow get, list, create, update, delete: if isOwner(userId);
+        }
+
+        match /customerIntegrations/{integrationId} {
           allow get, list, create, update, delete: if isOwner(userId);
         }
       }

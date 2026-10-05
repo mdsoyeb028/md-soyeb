@@ -804,6 +804,7 @@ export function loadGuestBusinessAgents(): BusinessAgentConfig[] {
     return [];
   }
 }
+export const loadBusinessAgents = loadGuestBusinessAgents;
 
 // Save or Update Agent Task with lifecycle status
 export async function saveAgentTask(

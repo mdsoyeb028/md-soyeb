@@ -35,6 +35,7 @@ import { generateBusinessAgentProfile } from "./src/server/businessAgentGenerato
 import { handleAgentChat } from "./src/server/agentChatHandler.ts";
 import { executeAgentTool, SupportedAgentTool } from "./src/server/agentToolDispatcher.ts";
 import { parseBusinessDocument } from "./src/server/documentParser.ts";
+import { handleCustomerAgentChat } from "./src/server/customerAgentChatHandler.ts";
 import { CENTRAL_PLANS } from "./src/data/plans.ts";
 
 dotenv.config();
@@ -563,6 +564,101 @@ app.post("/api/ai/agent-chat", async (req, res) => {
     recordSuccessfulUsage(userId, req.ip);
 
     res.json({ success: true, ...chatRes });
+  } catch (err: unknown) {
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Real AI Customer Agent Chat Endpoint (Widget & Private Console)
+app.post("/api/ai/customer-agent-chat", async (req, res) => {
+  try {
+    const { 
+      message, 
+      customerConfig, 
+      conversationHistory, 
+      knowledgeItems, 
+      businessContext, 
+      language,
+      userId
+    } = req.body || {};
+
+    if (!message || typeof message !== "string" || !message.trim()) {
+      res.status(400).json({ success: false, error: "Customer message is required." });
+      return;
+    }
+
+    if (!customerConfig || !customerConfig.agentId) {
+      res.status(400).json({ success: false, error: "Customer agent configuration is required." });
+      return;
+    }
+
+    const chatRes = await handleCustomerAgentChat({
+      message: message.trim(),
+      customerConfig,
+      conversationHistory,
+      knowledgeItems,
+      businessContext,
+      language,
+    });
+
+    recordSuccessfulUsage(userId, req.ip);
+    res.json({ success: true, ...chatRes });
+  } catch (err: unknown) {
+    if (isProviderQuotaError(err)) {
+      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
+    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
+  }
+});
+
+// Real AI Customer Agent Voice Endpoint
+app.post("/api/ai/customer-agent-voice", async (req, res) => {
+  try {
+    const { 
+      agentId, 
+      callerAudioTranscript, 
+      customerConfig, 
+      conversationHistory, 
+      knowledgeItems,
+      businessContext,
+      userId
+    } = req.body || {};
+
+    if (!callerAudioTranscript || !callerAudioTranscript.trim()) {
+      res.status(400).json({ success: false, error: "Caller audio transcript is required." });
+      return;
+    }
+
+    const hasTwilioCredentials = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+
+    const chatRes = await handleCustomerAgentChat({
+      message: callerAudioTranscript.trim(),
+      conversationHistory: conversationHistory || [],
+      customerConfig: customerConfig || { agentId, agentName: "AI Voice Employee", tone: "Professional" },
+      knowledgeItems: knowledgeItems || [],
+      businessContext: businessContext || {},
+    });
+
+    recordSuccessfulUsage(userId, req.ip);
+
+    res.json({
+      success: true,
+      audioResponseText: chatRes.replyText,
+      intent: chatRes.intent,
+      leadData: chatRes.leadData,
+      appointmentData: chatRes.appointmentData,
+      humanHandoffReason: chatRes.humanHandoffReason,
+      telephonyStatus: hasTwilioCredentials ? "ACTIVE_TWILIO_TRUNK" : "PHONE_PROVIDER_NOT_CONNECTED",
+      telephonyNotice: hasTwilioCredentials 
+        ? "Connected to live telephony trunk."
+        : "Phone provider not connected. Inbound voice simulation active.",
+      provider: chatRes.provider
+    });
   } catch (err: unknown) {
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
