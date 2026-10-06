@@ -72,7 +72,11 @@ service cloud.firestore {
     // User profile document
     match /users/{userId} {
       allow get, list: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidUser(request.resource.data, userId);
+      // Users cannot write or modify the 'plan' field themselves (managed strictly server-side / Admin SDK)
+      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId) &&
+        !('plan' in request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data, userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan']);
       allow delete: if isOwner(userId);
 
       // Private reports subcollection

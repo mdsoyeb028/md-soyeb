@@ -20,6 +20,7 @@ import {
 import { SavedItem, ActiveTab } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { authFetch } from "../utils/apiHelper";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
@@ -107,7 +108,7 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiv
     }
 
     try {
-      const res = await fetch("/api/ai/business", {
+      const res = await authFetch("/api/ai/business", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { SavedItem, ExportAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { authFetch } from "../utils/apiHelper";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
@@ -107,7 +108,7 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
     setSaved(false);
 
     try {
-      const res = await fetch("/api/ai/export", {
+      const res = await authFetch("/api/ai/export", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

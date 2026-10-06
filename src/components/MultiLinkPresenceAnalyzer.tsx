@@ -34,6 +34,7 @@ import {
 import { detectUrlPlatform } from "../utils/urlDetector";
 import { useLanguage } from "../i18n/LanguageContext";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { authFetch } from "../utils/apiHelper";
 import { useCredits } from "../context/CreditsContext";
 
 interface PresenceLinkItem {
@@ -146,7 +147,7 @@ export const MultiLinkPresenceAnalyzer: React.FC<MultiLinkPresenceAnalyzerProps>
     const stepTimer2 = setTimeout(() => setLoadingStep(3), 3200);
 
     try {
-      const res = await fetch("/api/ai/presence-analyzer", {
+      const res = await authFetch("/api/ai/presence-analyzer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

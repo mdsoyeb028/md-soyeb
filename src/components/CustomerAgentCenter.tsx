@@ -539,7 +539,6 @@ export const CustomerAgentCenter: React.FC<CustomerAgentCenterProps> = ({
           conversationHistory: voiceCallLogs.map((l) => ({ role: l.role, content: l.text })),
           knowledgeItems: knowledgeItems.filter((k) => k.state === "READY"),
           businessContext: activeBusinessAgent || {},
-          userId: user?.uid,
         }),
       });
 

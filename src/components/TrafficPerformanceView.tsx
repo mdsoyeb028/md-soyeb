@@ -30,6 +30,7 @@ import {
   Megaphone
 } from "lucide-react";
 import { SavedItem, TrafficFunnelItem, TrafficSourceItem, DiagnosticCardItem, ScreenshotAnalysisResult, VisualAnnotation } from "../types";
+import { authFetch } from "../utils/apiHelper";
 import { useCredits } from "../context/CreditsContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { AILanguageSelector } from "./AILanguageSelector";
@@ -285,7 +286,7 @@ export const TrafficPerformanceView: React.FC<TrafficPerformanceViewProps> = ({ 
     setImageError(null);
 
     try {
-      const res = await fetch("/api/ai/analyze-screenshot", {
+      const res = await authFetch("/api/ai/analyze-screenshot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -383,7 +384,7 @@ export const TrafficPerformanceView: React.FC<TrafficPerformanceViewProps> = ({ 
     }
 
     try {
-      const res = await fetch("/api/ai/fix-problem", {
+      const res = await authFetch("/api/ai/fix-problem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -421,7 +422,7 @@ export const TrafficPerformanceView: React.FC<TrafficPerformanceViewProps> = ({ 
     setAcquisitionResult(null);
 
     try {
-      const res = await fetch("/api/ai/customer-acquisition", {
+      const res = await authFetch("/api/ai/customer-acquisition", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -458,7 +459,7 @@ export const TrafficPerformanceView: React.FC<TrafficPerformanceViewProps> = ({ 
     setAdsResult(null);
 
     try {
-      const res = await fetch("/api/ai/ads-plan", {
+      const res = await authFetch("/api/ai/ads-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

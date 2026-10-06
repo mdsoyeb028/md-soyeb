@@ -1,8 +1,8 @@
 import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
 import { generateBusinessAgentProfile } from "../businessAgentGenerator.ts";
 import { 
-  verifyPlanLimit, 
-  recordSuccessfulUsage, 
+  enforcePlanLimit, 
+  refundUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
 } from "../planEnforcement.ts";
@@ -30,6 +30,9 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const body = await parseRequestBody(req);
     const { 
@@ -46,38 +49,14 @@ export default async function handler(req: any, res: any) {
       brandTone, 
       socialUrls, 
       businessGoals, 
-      customInstructions,
-      userId,
-      userPlan,
-      isAnonymous
+      customInstructions
     } = body || {};
 
     if (!name || !industry) {
+      await refundUsage(planCheck.key);
       sendJsonResponse(res, 400, {
         success: false,
         error: "Business name and industry are required to create an agent.",
-      });
-      return;
-    }
-
-    const rawIp = req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
-    const clientIp = Array.isArray(rawIp) ? rawIp[0] : String(rawIp).split(",")[0].trim();
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp,
-    });
-
-    if (!planCheck.allowed) {
-      sendJsonResponse(res, 429, {
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
       });
       return;
     }
@@ -101,17 +80,19 @@ export default async function handler(req: any, res: any) {
       socialUrls,
       businessGoals,
       customInstructions,
-      userId,
+      userId: planCheck.user.uid || undefined,
     });
-
-    // Record usage only on success
-    recordSuccessfulUsage(userId, clientIp);
 
     sendJsonResponse(res, 200, {
       success: true,
-      ...generated,
+      agent: generated.agent,
+      customSystemPrompt: generated.customSystemPrompt,
+      recommendedWorkflowTemplates: generated.recommendedWorkflowTemplates,
+      initialSuggestedTasks: generated.initialSuggestedTasks,
+      quickPrompts: generated.quickPrompts,
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       sendJsonResponse(res, 429, {
         success: false,
@@ -120,9 +101,6 @@ export default async function handler(req: any, res: any) {
       });
       return;
     }
-    sendJsonResponse(res, 500, {
-      success: false,
-      error: normalizeServerErrorMessage(err),
-    });
+    sendJsonResponse(res, 500, { success: false, error: normalizeServerErrorMessage(err) });
   }
 }

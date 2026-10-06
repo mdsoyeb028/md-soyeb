@@ -1,8 +1,8 @@
 import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
 import { generateAICompletion, normalizeServerErrorMessage } from "../aiProvider.ts";
 import { 
-  verifyPlanLimit, 
-  recordSuccessfulUsage, 
+  enforcePlanLimit, 
+  refundUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
 } from "../planEnforcement.ts";
@@ -28,47 +28,27 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const body = await parseRequestBody(req);
     const { 
       reportType, 
       agentConfig, 
       customFocus, 
-      language = "English",
-      userId,
-      userPlan,
-      isAnonymous
+      language = "English"
     } = body || {};
 
     if (!reportType) {
+      await refundUsage(planCheck.key);
       sendJsonResponse(res, 400, { success: false, error: "Report type is required." });
       return;
     }
 
     if (!agentConfig || !agentConfig.name) {
+      await refundUsage(planCheck.key);
       sendJsonResponse(res, 400, { success: false, error: "Agent configuration is required." });
-      return;
-    }
-
-    const rawIp = req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
-    const clientIp = Array.isArray(rawIp) ? rawIp[0] : String(rawIp).split(",")[0].trim();
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp,
-    });
-
-    if (!planCheck.allowed) {
-      sendJsonResponse(res, 429, {
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -95,9 +75,6 @@ Strict Rules:
       systemPrompt: `You are an expert strategic business consultant. Write thorough, actionable business reports in ${language}.`,
     });
 
-    // Record usage only on success
-    recordSuccessfulUsage(userId, clientIp);
-
     const reportId = `report_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const title = `${reportType} — ${agentConfig.name}`;
     const summary = `Comprehensive ${reportType} generated for ${agentConfig.name} (${agentConfig.industry}) with immediate execution roadmap.`;
@@ -107,18 +84,22 @@ Strict Rules:
       report: {
         id: reportId,
         agentId: agentConfig.id,
-        userId: userId || "guest",
+        userId: planCheck.user.uid || "guest",
         title,
         type: "business",
-        category: reportType,
         summary,
         content: completion.text,
         createdAt: new Date().toISOString(),
       },
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
-      sendJsonResponse(res, 429, { success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      sendJsonResponse(res, 429, {
+        success: false,
+        error: "provider_quota_reached",
+        message: getProviderQuotaErrorMessage(),
+      });
       return;
     }
     sendJsonResponse(res, 500, { success: false, error: normalizeServerErrorMessage(err) });

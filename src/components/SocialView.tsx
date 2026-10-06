@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SavedItem, SocialMediaResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { authFetch } from "../utils/apiHelper";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
@@ -81,7 +82,7 @@ export const SocialView: React.FC<SocialViewProps> = ({ onSaveItem }) => {
     setHasSaved(false);
 
     try {
-      const res = await fetch("/api/ai/social", {
+      const res = await authFetch("/api/ai/social", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

@@ -25,6 +25,8 @@ import {
 } from "./src/server/intentAndLanguageDetector.ts";
 import { handleConversationalResponse } from "./src/server/conversationalHandler.ts";
 import { 
+  enforcePlanLimit,
+  refundUsage,
   verifyPlanLimit, 
   recordSuccessfulUsage, 
   isProviderQuotaError, 
@@ -42,6 +44,8 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+app.set("trust proxy", 1);
 
 // Handle serverless runtimes (e.g. Vercel) where req.body has already been buffered/parsed
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -275,9 +279,13 @@ app.post("/api/analytics/diagnose", (req, res) => {
 
 // Multimodal Screenshot & Image Problem Solver
 app.post("/api/ai/analyze-screenshot", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { imageBase64, imageMimeType, imageType, language, userNotes } = req.body || {};
     if (!imageBase64 || typeof imageBase64 !== "string") {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Image data (base64) is required." });
       return;
     }
@@ -290,15 +298,20 @@ app.post("/api/ai/analyze-screenshot", async (req, res) => {
     });
     res.json({ success: true, analysis });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
   }
 });
 
 // Customer Acquisition Strategy Solver (Client kaise aayega? / 100 customers)
 app.post("/api/ai/customer-acquisition", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { query, businessContext, language } = req.body || {};
     if (!query || typeof query !== "string" || !query.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Acquisition query is required." });
       return;
     }
@@ -309,15 +322,20 @@ app.post("/api/ai/customer-acquisition", async (req, res) => {
     );
     res.json({ success: true, plan });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
   }
 });
 
 // Ads Plan Generator (Google, Meta, Instagram, YouTube)
 app.post("/api/ai/ads-plan", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { platform, productService, targetLocation, monthlyBudget, language } = req.body || {};
     if (!productService || !targetLocation) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Product/Service and target location are required." });
       return;
     }
@@ -330,15 +348,20 @@ app.post("/api/ai/ads-plan", async (req, res) => {
     });
     res.json({ success: true, plan });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
   }
 });
 
 // End-to-end Problem Fix Action Plan Generator
 app.post("/api/ai/fix-problem", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { problemTitle, observedData, businessContext, language } = req.body || {};
     if (!problemTitle) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Problem title is required." });
       return;
     }
@@ -350,6 +373,7 @@ app.post("/api/ai/fix-problem", async (req, res) => {
     );
     res.json({ success: true, fixPlan });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
   }
 });
@@ -370,6 +394,9 @@ app.get(["/api/plans", "/api/plans/config"], (_req, res) => {
 
 // Create My Business AI Agent
 app.post("/api/ai/agent-create", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { 
       name, 
@@ -385,33 +412,12 @@ app.post("/api/ai/agent-create", async (req, res) => {
       brandTone, 
       socialUrls, 
       businessGoals, 
-      customInstructions,
-      userId,
-      userPlan,
-      isAnonymous
+      customInstructions
     } = req.body || {};
 
     if (!name || !industry) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Business name and industry are required to create an agent." });
-      return;
-    }
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp: req.ip,
-    });
-
-    if (!planCheck.allowed) {
-      res.status(429).json({
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -434,14 +440,12 @@ app.post("/api/ai/agent-create", async (req, res) => {
       socialUrls,
       businessGoals,
       customInstructions,
-      userId,
+      userId: planCheck.user.uid || "guest",
     });
-
-    // Record usage only on success
-    recordSuccessfulUsage(userId, req.ip);
 
     res.json({ success: true, ...generated });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
@@ -452,38 +456,20 @@ app.post("/api/ai/agent-create", async (req, res) => {
 
 // Voice Agent Interaction (Talk to AI)
 app.post("/api/ai/agent-voice", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { 
       speechText, 
       agentConfig, 
       conversationHistory, 
-      language,
-      userId,
-      userPlan,
-      isAnonymous
+      language
     } = req.body || {};
 
     if (!speechText || typeof speechText !== "string" || !speechText.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Spoken text is required." });
-      return;
-    }
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp: req.ip,
-    });
-
-    if (!planCheck.allowed) {
-      res.status(429).json({
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -494,11 +480,9 @@ app.post("/api/ai/agent-voice", async (req, res) => {
       language: language || "English",
     });
 
-    // Record usage on success
-    recordSuccessfulUsage(userId, req.ip);
-
     res.json({ success: true, ...voiceRes });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
@@ -509,45 +493,28 @@ app.post("/api/ai/agent-voice", async (req, res) => {
 
 // Interactive Business Agent Chat
 app.post("/api/ai/agent-chat", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { 
       message, 
       agentConfig, 
       conversationHistory, 
       attachedDocuments, 
-      analyzedUrlContext,
-      language,
-      userId,
-      userPlan,
-      isAnonymous
+      analyzedUrlContext, 
+      language
     } = req.body || {};
 
     if (!message || typeof message !== "string" || !message.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Message is required." });
       return;
     }
 
     if (!agentConfig || !agentConfig.name) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Active business agent configuration is required." });
-      return;
-    }
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp: req.ip,
-    });
-
-    if (!planCheck.allowed) {
-      res.status(429).json({
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -560,11 +527,9 @@ app.post("/api/ai/agent-chat", async (req, res) => {
       language,
     });
 
-    // Record usage only on success
-    recordSuccessfulUsage(userId, req.ip);
-
     res.json({ success: true, ...chatRes });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
@@ -575,6 +540,9 @@ app.post("/api/ai/agent-chat", async (req, res) => {
 
 // Real AI Customer Agent Chat Endpoint (Widget & Private Console)
 app.post("/api/ai/customer-agent-chat", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { 
       message, 
@@ -582,16 +550,17 @@ app.post("/api/ai/customer-agent-chat", async (req, res) => {
       conversationHistory, 
       knowledgeItems, 
       businessContext, 
-      language,
-      userId
+      language
     } = req.body || {};
 
     if (!message || typeof message !== "string" || !message.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Customer message is required." });
       return;
     }
 
     if (!customerConfig || !customerConfig.agentId) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Customer agent configuration is required." });
       return;
     }
@@ -605,9 +574,9 @@ app.post("/api/ai/customer-agent-chat", async (req, res) => {
       language,
     });
 
-    recordSuccessfulUsage(userId, req.ip);
     res.json({ success: true, ...chatRes });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
@@ -618,18 +587,21 @@ app.post("/api/ai/customer-agent-chat", async (req, res) => {
 
 // Real AI Customer Agent Voice Endpoint
 app.post("/api/ai/customer-agent-voice", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { 
       agentId, 
       callerAudioTranscript, 
       customerConfig, 
       conversationHistory, 
-      knowledgeItems,
-      businessContext,
-      userId
+      knowledgeItems, 
+      businessContext
     } = req.body || {};
 
     if (!callerAudioTranscript || !callerAudioTranscript.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Caller audio transcript is required." });
       return;
     }
@@ -643,8 +615,6 @@ app.post("/api/ai/customer-agent-voice", async (req, res) => {
       knowledgeItems: knowledgeItems || [],
       businessContext: businessContext || {},
     });
-
-    recordSuccessfulUsage(userId, req.ip);
 
     res.json({
       success: true,
@@ -660,6 +630,7 @@ app.post("/api/ai/customer-agent-voice", async (req, res) => {
       provider: chatRes.provider
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
@@ -670,38 +641,20 @@ app.post("/api/ai/customer-agent-voice", async (req, res) => {
 
 // Agent Tool Execution
 app.post("/api/ai/agent-tool", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { 
       tool, 
       args, 
       agentConfig, 
-      language,
-      userId,
-      userPlan,
-      isAnonymous
+      language
     } = req.body || {};
 
     if (!tool || typeof tool !== "string") {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Tool name is required." });
-      return;
-    }
-
-    // Internal tool calls count as 1 user request or part of the active session
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp: req.ip,
-    });
-
-    if (!planCheck.allowed) {
-      res.status(429).json({
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -712,13 +665,9 @@ app.post("/api/ai/agent-tool", async (req, res) => {
       language: language || "English",
     });
 
-    // Record usage only on success
-    if (toolRes.success) {
-      recordSuccessfulUsage(userId, req.ip);
-    }
-
     res.json({ success: true, result: toolRes });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
@@ -885,43 +834,26 @@ app.post("/api/ai/agent-url-analyze", async (req, res) => {
 
 // Generate Business Reports for Agent (Business Analysis, SEO, Marketing, Sales, Competitor, etc.)
 app.post("/api/ai/agent-report-generate", async (req, res) => {
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { 
       reportType, 
       agentConfig, 
       customFocus, 
-      language = "English",
-      userId,
-      userPlan,
-      isAnonymous
+      language = "English"
     } = req.body || {};
 
     if (!reportType) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Report type is required." });
       return;
     }
 
     if (!agentConfig || !agentConfig.name) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ success: false, error: "Agent configuration is required." });
-      return;
-    }
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp: req.ip,
-    });
-
-    if (!planCheck.allowed) {
-      res.status(429).json({
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -948,9 +880,6 @@ Strict Rules:
       systemPrompt: `You are an expert strategic business consultant. Write thorough, actionable business reports in ${language}.`,
     });
 
-    // Record usage only on success
-    recordSuccessfulUsage(userId, req.ip);
-
     const reportId = `report_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const title = `${reportType} — ${agentConfig.name}`;
     const summary = `Comprehensive ${reportType} generated for ${agentConfig.name} (${agentConfig.industry}) with immediate execution roadmap.`;
@@ -960,7 +889,7 @@ Strict Rules:
       report: {
         id: reportId,
         agentId: agentConfig.id,
-        userId: userId || "guest",
+        userId: planCheck.user.uid || "guest",
         title,
         type: "business",
         category: reportType,
@@ -970,6 +899,7 @@ Strict Rules:
       },
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;
@@ -981,6 +911,7 @@ Strict Rules:
 // 1. Central AI Business Assistant & Self-Solving Engine
 app.post("/api/ai/assistant", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  let planCheckKey: string | null = null;
   try {
     const { 
       query, 
@@ -992,10 +923,6 @@ app.post("/api/ai/assistant", async (req, res) => {
       websiteUrl,
       doItForMe,
       businessProfile,
-      userId,
-      userPlan,
-      isAnonymous,
-      consultationsUsed,
     } = req.body || {};
 
     if (!query || typeof query !== "string" || !query.trim()) {
@@ -1014,25 +941,9 @@ app.post("/api/ai/assistant", async (req, res) => {
       return;
     }
 
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      consultationsUsed,
-      clientIp: req.ip,
-    });
-
-    if (!planCheck.allowed) {
-      res.status(429).json({
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
-      return;
-    }
+    const planCheck = await enforcePlanLimit(req, res);
+    if (!planCheck.allowed) return;
+    planCheckKey = planCheck.key;
 
     const trimmedQuery = query.trim();
     const domainContext = category && typeof category === "string" ? category.trim() : "General Business Growth & Export Strategy";
@@ -1056,8 +967,6 @@ app.post("/api/ai/assistant", async (req, res) => {
         targetLanguage: selectedLanguage,
         conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : [],
       });
-
-      recordSuccessfulUsage(userId, req.ip);
 
       res.json({
         success: true,
@@ -1882,9 +1791,8 @@ ${practicalResult.next_one_thing}
       content: markdownContent,
       source: sourceName,
     });
-
-    recordSuccessfulUsage(userId, req.ip);
   } catch (err: unknown) {
+    if (planCheckKey) await refundUsage(planCheckKey);
     console.error("Assistant API error:", err);
     if (isProviderQuotaError(err)) {
       res.status(429).json({
@@ -1914,6 +1822,9 @@ ${practicalResult.next_one_thing}
 // 1b. Real Verified Prospect Research Endpoint
 app.post("/api/ai/prospects", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const {
       service,
@@ -1946,6 +1857,7 @@ app.post("/api/ai/prospects", async (req, res) => {
       data: prospectResult,
     });
   } catch (err: any) {
+    await refundUsage(planCheck.key);
     res.status(500).json({
       success: false,
       error: "Unable to process prospect research request.",
@@ -1956,10 +1868,14 @@ app.post("/api/ai/prospects", async (req, res) => {
 // 1c. Multi-Link Business Presence Analyzer Endpoint
 app.post("/api/ai/presence-analyzer", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { links, language, languageName, businessContext } = req.body || {};
 
     if (!Array.isArray(links) || links.length === 0) {
+      await refundUsage(planCheck.key);
       res.status(400).json({
         success: false,
         error: "At least one public business link (website, YouTube, Instagram, App, Google Business Profile) is required.",
@@ -1972,6 +1888,7 @@ app.post("/api/ai/presence-analyzer", async (req, res) => {
       .slice(0, 10); // cap to 10 links per request
 
     if (validLinks.length === 0) {
+      await refundUsage(planCheck.key);
       res.status(400).json({
         success: false,
         error: "No valid URLs provided in request.",
@@ -1990,6 +1907,7 @@ app.post("/api/ai/presence-analyzer", async (req, res) => {
       data: result,
     });
   } catch (err: any) {
+    await refundUsage(planCheck.key);
     console.error("Presence analyzer endpoint error:", err);
     res.status(500).json({
       success: false,
@@ -2013,9 +1931,13 @@ app.post("/api/ai/detect-url", (req, res) => {
 // 2. Real SEO Audit Endpoint (Live Crawler + HTML Parser + Mathematical Score)
 app.post("/api/ai/seo", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { url, keyword, language, languageName } = req.body || {};
     if (!url || typeof url !== "string" || !url.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ 
         success: false, 
         error: "A valid website URL is required (e.g., https://example.com)." 
@@ -2024,6 +1946,7 @@ app.post("/api/ai/seo", async (req, res) => {
     }
 
     if (url.length > 500) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ 
         success: false, 
         error: "URL length exceeds 500 characters." 
@@ -2084,6 +2007,7 @@ Generate optimized meta title and meta description recommendations for this exac
       ...auditResult,
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     const message = normalizeServerErrorMessage(err, "SEO audit could not be completed.");
     console.error("SEO Audit Error:", message);
     const status = message.includes("SSRF") || message.includes("Invalid URL") || message.includes("empty") ? 400 : 502;
@@ -2098,10 +2022,14 @@ Generate optimized meta title and meta description recommendations for this exac
 // 3. Social Media Content Generation Engine
 app.post("/api/ai/social", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { platform, business, category, audience, topic, language, contentType } = req.body || {};
 
     if (!business || typeof business !== "string" || !business.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ 
         success: false, 
         error: "Business or brand name is required." 
@@ -2110,6 +2038,7 @@ app.post("/api/ai/social", async (req, res) => {
     }
 
     if (business.length > 300) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ 
         success: false, 
         error: "Business name exceeds 300 characters limit." 
@@ -2219,6 +2148,7 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
       source: sourceName,
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     console.error("Social API error:", err);
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({
@@ -2239,6 +2169,9 @@ Generate content formatted strictly as valid JSON adhering to this exact schema:
 // 4. Export Intelligence Engine
 app.post("/api/ai/export", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const {
       productName,
@@ -2257,6 +2190,7 @@ app.post("/api/ai/export", async (req, res) => {
     } = req.body || {};
 
     if (!productName || typeof productName !== "string" || !productName.trim()) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ 
         success: false, 
         error: "Product name is required for export analysis." 
@@ -2265,6 +2199,7 @@ app.post("/api/ai/export", async (req, res) => {
     }
 
     if (productName.length > 300) {
+      await refundUsage(planCheck.key);
       res.status(400).json({ 
         success: false, 
         error: "Product name exceeds 300 characters limit." 
@@ -2367,6 +2302,7 @@ Respond with strictly valid JSON according to this exact JSON schema:
       source: sourceName,
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     console.error("Export API error:", err);
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({
@@ -2387,10 +2323,14 @@ Respond with strictly valid JSON according to this exact JSON schema:
 // 5. Business Planning & Growth Suite Endpoint
 app.post("/api/ai/business", async (req, res) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const { toolType, inputData, language, languageName } = req.body || {};
 
     if (!toolType || typeof toolType !== "string") {
+      await refundUsage(planCheck.key);
       res.status(400).json({ 
         success: false, 
         error: "toolType is required." 
@@ -2426,6 +2366,7 @@ Be rigorous, realistic, and commercially sound. Do not invent fake statistics or
       source: sourceName,
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     console.error("Business API error:", err);
     if (err instanceof AIProviderError) {
       res.status(err.statusCode).json({

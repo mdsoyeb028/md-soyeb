@@ -1,5 +1,12 @@
 import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
 import { handleCustomerAgentChat } from "../customerAgentChatHandler.ts";
+import { 
+  enforcePlanLimit, 
+  refundUsage, 
+  isProviderQuotaError, 
+  getProviderQuotaErrorMessage 
+} from "../planEnforcement.ts";
+import { normalizeServerErrorMessage } from "../aiProvider.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -22,6 +29,9 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const body = await parseRequestBody(req);
     const { 
@@ -34,6 +44,7 @@ export default async function handler(req: any, res: any) {
     } = body || {};
 
     if (!callerAudioTranscript || !callerAudioTranscript.trim()) {
+      await refundUsage(planCheck.key);
       sendJsonResponse(res, 400, { success: false, error: "Caller audio transcript is required." });
       return;
     }
@@ -62,9 +73,14 @@ export default async function handler(req: any, res: any) {
         : "Phone provider not connected — connect Twilio or SIP provider in Integrations to receive live phone calls.",
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
+    if (isProviderQuotaError(err)) {
+      sendJsonResponse(res, 429, { success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      return;
+    }
     sendJsonResponse(res, 500, { 
       success: false, 
-      error: err instanceof Error ? err.message : String(err) 
+      error: normalizeServerErrorMessage(err)
     });
   }
 }

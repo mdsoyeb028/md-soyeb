@@ -146,9 +146,6 @@ export const AgentOnboardingModal: React.FC<AgentOnboardingModalProps> = ({
           businessGoals: businessGoals.trim(),
           preferredLanguage,
           brandTone,
-          userId: user?.uid || "guest",
-          userPlan: plan,
-          isAnonymous,
         }),
       });
 

@@ -629,9 +629,6 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           brandTone: formBrandTone,
           socialUrls: [formSocialUrl, formYoutubeUrl, formAppUrl].filter(Boolean),
           customInstructions: formInstructions.trim() || undefined,
-          userId: user?.uid,
-          userPlan: plan,
-          isAnonymous,
         }),
       });
 
@@ -811,9 +808,6 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           conversationHistory: chatMessages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
           attachedDocuments: documents,
           language: activeAgent.preferredLanguage,
-          userId: user?.uid,
-          userPlan: plan,
-          isAnonymous,
         }),
       });
 
@@ -983,9 +977,6 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           agentConfig: activeAgent,
           conversationHistory: chatMessages.slice(-4).map((m) => ({ role: m.role, content: m.content })),
           language: activeAgent.preferredLanguage,
-          userId: user?.uid,
-          userPlan: plan,
-          isAnonymous,
         }),
       });
 
@@ -1186,9 +1177,6 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           },
           agentConfig: activeAgent,
           language: activeAgent?.preferredLanguage || "English",
-          userId: user?.uid,
-          userPlan: plan,
-          isAnonymous,
         }),
       });
 
@@ -1239,9 +1227,6 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           agentConfig: activeAgent,
           customFocus: reportCustomFocus.trim() || undefined,
           language: activeAgent.preferredLanguage || "English",
-          userId: user?.uid,
-          userPlan: plan,
-          isAnonymous,
         }),
       });
 

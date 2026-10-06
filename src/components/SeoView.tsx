@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { SavedItem, SeoAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
+import { authFetch } from "../utils/apiHelper";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
@@ -64,7 +65,7 @@ export const SeoView: React.FC<SeoViewProps> = ({ onSaveItem }) => {
     setHasSaved(false);
 
     try {
-      const res = await fetch("/api/ai/seo", {
+      const res = await authFetch("/api/ai/seo", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

@@ -151,8 +151,6 @@ export const PublicAgentView: React.FC<PublicAgentViewProps> = ({
           conversationHistory: messages.slice(-6),
           language: agent.preferredLanguage || "English",
           mode: "public_customer_inquiry",
-          userId: "public_visitor",
-          isAnonymous: true,
         }),
       });
 

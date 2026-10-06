@@ -1,8 +1,8 @@
 import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
 import { handleAgentVoiceInteraction } from "../agentVoiceHandler.ts";
 import { 
-  verifyPlanLimit, 
-  recordSuccessfulUsage, 
+  enforcePlanLimit, 
+  refundUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
 } from "../planEnforcement.ts";
@@ -29,42 +29,21 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const body = await parseRequestBody(req);
     const { 
       speechText, 
       agentConfig, 
       conversationHistory, 
-      language,
-      userId,
-      userPlan,
-      isAnonymous
+      language
     } = body || {};
 
     if (!speechText || typeof speechText !== "string" || !speechText.trim()) {
+      await refundUsage(planCheck.key);
       sendJsonResponse(res, 400, { success: false, error: "Spoken text is required." });
-      return;
-    }
-
-    const rawIp = req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
-    const clientIp = Array.isArray(rawIp) ? rawIp[0] : String(rawIp).split(",")[0].trim();
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp,
-    });
-
-    if (!planCheck.allowed) {
-      sendJsonResponse(res, 429, {
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -75,11 +54,9 @@ export default async function handler(req: any, res: any) {
       language: language || "English",
     });
 
-    // Record usage on success
-    recordSuccessfulUsage(userId, clientIp);
-
     sendJsonResponse(res, 200, { success: true, ...voiceRes });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       sendJsonResponse(res, 429, { success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
       return;

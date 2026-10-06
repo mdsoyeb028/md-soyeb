@@ -1,8 +1,8 @@
 import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
 import { executeAgentTool, SupportedAgentTool } from "../agentToolDispatcher.ts";
 import { 
-  verifyPlanLimit, 
-  recordSuccessfulUsage, 
+  enforcePlanLimit, 
+  refundUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
 } from "../planEnforcement.ts";
@@ -29,42 +29,21 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
+
   try {
     const body = await parseRequestBody(req);
     const { 
       tool, 
       args, 
       agentConfig, 
-      language,
-      userId,
-      userPlan,
-      isAnonymous
+      language
     } = body || {};
 
     if (!tool || typeof tool !== "string") {
+      await refundUsage(planCheck.key);
       sendJsonResponse(res, 400, { success: false, error: "Tool name is required." });
-      return;
-    }
-
-    const rawIp = req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
-    const clientIp = Array.isArray(rawIp) ? rawIp[0] : String(rawIp).split(",")[0].trim();
-
-    // Server-side plan limit check
-    const planCheck = verifyPlanLimit({
-      userId,
-      clientPlan: userPlan,
-      isAnonymous,
-      clientIp,
-    });
-
-    if (!planCheck.allowed) {
-      sendJsonResponse(res, 429, {
-        success: false,
-        error: planCheck.code,
-        message: planCheck.message,
-        limit: planCheck.limit,
-        plan: planCheck.plan,
-      });
       return;
     }
 
@@ -75,13 +54,13 @@ export default async function handler(req: any, res: any) {
       language: language || "English",
     });
 
-    // Record usage only on success
-    if (toolRes.success) {
-      recordSuccessfulUsage(userId, clientIp);
+    if (!toolRes.success) {
+      await refundUsage(planCheck.key);
     }
 
     sendJsonResponse(res, 200, { success: true, result: toolRes });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
       sendJsonResponse(res, 429, {
         success: false,
