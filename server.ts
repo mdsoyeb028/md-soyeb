@@ -27,8 +27,6 @@ import { handleConversationalResponse } from "./src/server/conversationalHandler
 import { 
   enforcePlanLimit,
   refundUsage,
-  verifyPlanLimit, 
-  recordSuccessfulUsage, 
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
 } from "./src/server/planEnforcement.ts";

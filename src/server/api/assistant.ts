@@ -8,6 +8,12 @@ import {
 import { performRealSeoAudit } from "../seoCrawler.ts";
 import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
 import { performRealResearch, buildVerifiedProspectWorkflow } from "../researchEngine.ts";
+import { 
+  enforcePlanLimit, 
+  refundUsage, 
+  isProviderQuotaError, 
+  getProviderQuotaErrorMessage 
+} from "../planEnforcement.ts";
 
 export default async function handler(req: any, res: any) {
   // Handle CORS / preflight requests if needed
@@ -30,6 +36,9 @@ export default async function handler(req: any, res: any) {
     });
     return;
   }
+
+  const planCheck = await enforcePlanLimit(req, res);
+  if (!planCheck.allowed) return;
 
   try {
     const body = await parseRequestBody(req);
@@ -877,7 +886,17 @@ ${practicalResult.next_one_thing}
       source: sourceName,
     });
   } catch (err: unknown) {
+    await refundUsage(planCheck.key);
     console.error("Assistant API error:", err);
+    if (isProviderQuotaError(err)) {
+      sendJsonResponse(res, 429, {
+        success: false,
+        error: "provider_quota_reached",
+        message: getProviderQuotaErrorMessage(),
+        code: "PROVIDER_QUOTA_REACHED",
+      });
+      return;
+    }
     if (err instanceof AIProviderError) {
       sendJsonResponse(res, err.statusCode, {
         success: false,

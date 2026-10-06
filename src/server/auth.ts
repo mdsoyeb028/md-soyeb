@@ -119,7 +119,7 @@ export async function verifyAuthToken(req: any): Promise<AuthenticatedUser> {
     const auth = getAuth(app);
     const decoded = await auth.verifyIdToken(token);
     const uid = decoded.uid;
-    const isAnonymous = decoded.firebase?.sign_in_provider === "anonymous" || !decoded.email;
+    const isAnonymous = decoded.firebase?.sign_in_provider === "anonymous";
 
     // Fetch the verified plan directly from Firestore users/{uid}.plan on the server
     let plan: SubscriptionPlanId = "free";

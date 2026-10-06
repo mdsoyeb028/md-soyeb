@@ -13,7 +13,7 @@ export interface PlanVerificationResult {
   key: string;
 }
 
-// In-memory fallback if UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not set
+// In-memory fallback if UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not configured
 const memoryUsageStore = new Map<string, number>();
 
 let redisClient: Redis | null = null;
@@ -34,7 +34,7 @@ export function getTodayString(): string {
 }
 
 /**
- * Atomic INCR on Redis (or in-memory fallback).
+ * Atomic INCR on Upstash Redis (or memory fallback).
  */
 async function atomicIncr(key: string): Promise<number> {
   const redis = getRedis();
@@ -54,7 +54,7 @@ async function atomicIncr(key: string): Promise<number> {
 }
 
 /**
- * Atomic DECR on Redis (or in-memory fallback) to refund failed or over-limit requests.
+ * Atomic DECR on Upstash Redis (or memory fallback) to refund failed or over-limit requests.
  */
 async function atomicDecr(key: string): Promise<number> {
   const redis = getRedis();
@@ -71,7 +71,7 @@ async function atomicDecr(key: string): Promise<number> {
 
 /**
  * Reserves usage BEFORE the AI call using atomic INCR with key usage:{id}:{YYYY-MM-DD}.
- * Not-logged-in guests get 1 free request per day per IP.
+ * Not-logged-in guests get 3 free requests per day per IP.
  * Verified users get daily limits based on their Firestore users/{uid}.plan.
  */
 export async function reserveUsage(params: {
@@ -86,8 +86,9 @@ export async function reserveUsage(params: {
   const key = `usage:${id}:${today}`;
 
   // 1. Determine plan limit
-  // Guests get 1 free request per day per IP
-  const limit = isGuest ? 1 : getDailyLimitForPlan(params.plan);
+  // Guests get 3 free requests per day per IP
+  const GUEST_DAILY_LIMIT = 3;
+  const limit = isGuest ? GUEST_DAILY_LIMIT : getDailyLimitForPlan(params.plan);
 
   // 2. Atomic INCR to reserve usage
   const count = await atomicIncr(key);
@@ -101,8 +102,8 @@ export async function reserveUsage(params: {
       return {
         allowed: false,
         code: "need_signup",
-        message: "You have used your 1 free daily request. Please sign in or create a free account to continue with 10 free AI requests daily.",
-        limit: 1,
+        message: "You have used your 3 free daily requests. Please sign in or create a free account to continue with 10 free AI requests daily.",
+        limit: GUEST_DAILY_LIMIT,
         currentCount: count - 1,
         plan: "guest",
         key,
@@ -157,12 +158,32 @@ export async function refundUsage(key: string): Promise<void> {
  * Central enforcement helper:
  * Verifies ID token from "Authorization: Bearer <token>", reads plan from Firestore on server,
  * and atomically reserves usage before the AI call. Sends 429 response if rejected.
+ * If UPSTASH env variables are missing in production (process.env.VERCEL set), fails closed: returns 503.
  */
 export async function enforcePlanLimit(
   req: any,
   res: any
 ): Promise<{ allowed: boolean; key: string; user: AuthenticatedUser }> {
   const authUser = await verifyAuthToken(req);
+
+  // If UPSTASH env variables are missing in production (process.env.VERCEL set), fail closed: return 503
+  if (process.env.VERCEL && (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN)) {
+    const errorBody = {
+      success: false,
+      error: "service_unavailable",
+      message: "Rate limiting service is unconfigured in production. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
+    };
+    if (typeof res.status === "function" && typeof res.json === "function") {
+      res.status(503).json(errorBody);
+    } else {
+      res.statusCode = 503;
+      if (typeof res.setHeader === "function" && !res.headersSent) {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+      }
+      res.end(JSON.stringify(errorBody));
+    }
+    return { allowed: false, key: "", user: authUser };
+  }
 
   const rawIp =
     req.ip ||
@@ -207,40 +228,34 @@ export async function enforcePlanLimit(
 
 /**
  * Formats provider limit errors into human-readable messages.
+ * Checks err.status === 429 or provider error codes instead of loose substring "429".
  */
 export function isProviderQuotaError(error: unknown): boolean {
   if (!error) return false;
-  const str = String(error).toLowerCase();
+  const err = error as any;
+  if (err.status === 429 || err.statusCode === 429) {
+    return true;
+  }
+  const code = (err.code || err.error?.code || "").toString().toLowerCase();
+  if (
+    code === "resource_exhausted" ||
+    code === "rate_limit_exceeded" ||
+    code === "quota_exceeded" ||
+    code === "insufficient_quota" ||
+    code === "too_many_requests" ||
+    code === "429"
+  ) {
+    return true;
+  }
+  const msg = (err.message || "").toString().toLowerCase();
   return (
-    str.includes("resource_exhausted") ||
-    str.includes("quota exceeded") ||
-    str.includes("rate limit") ||
-    str.includes("429") ||
-    str.includes("too many requests")
+    msg.includes("resource_exhausted") ||
+    msg.includes("rate limit") ||
+    msg.includes("quota exceeded") ||
+    msg.includes("too many requests")
   );
 }
 
 export function getProviderQuotaErrorMessage(): string {
   return "Underlying AI provider capacity limit reached. Please wait a moment or upgrade for priority processing.";
-}
-
-// Backward-compatibility no-op/fallback aliases
-export function recordSuccessfulUsage(_userId?: string, _clientIp?: string): { currentCount: number } {
-  return { currentCount: 1 };
-}
-
-export function verifyPlanLimit(params: {
-  userId?: string;
-  clientPlan?: string;
-  isAnonymous?: boolean;
-  consultationsUsed?: number;
-  clientIp?: string;
-}): { allowed: boolean; limit: number; currentCount: number; plan: SubscriptionPlanId; code?: any; message?: string } {
-  const plan = (params.clientPlan || "free") as SubscriptionPlanId;
-  return {
-    allowed: true,
-    limit: getDailyLimitForPlan(plan),
-    currentCount: 0,
-    plan,
-  };
 }
