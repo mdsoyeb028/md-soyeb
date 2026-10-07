@@ -6,6 +6,8 @@ export const CENTRAL_PLANS: Record<SubscriptionPlanId, PlanConfig> = {
     name: "FREE",
     priceMonthly: 0,
     priceAnnual: 0,
+    priceMonthlyINR: 0,
+    priceAnnualINR: 0,
     dailyQueryLimit: 10,
     description: "Essential starter toolkit for solo creators and early-stage micro enterprises.",
     features: [
@@ -52,6 +54,8 @@ export const CENTRAL_PLANS: Record<SubscriptionPlanId, PlanConfig> = {
     name: "STARTER",
     priceMonthly: 19,
     priceAnnual: 15,
+    priceMonthlyINR: 999,      // ₹999 for 30 days
+    priceAnnualINR: 9999,     // ₹9,999 for 365 days (save ~17%)
     dailyQueryLimit: 50,
     description: "For ambitious freelancers and emerging local brands scaling customer acquisition.",
     features: [
@@ -99,6 +103,8 @@ export const CENTRAL_PLANS: Record<SubscriptionPlanId, PlanConfig> = {
     name: "BUSINESS",
     priceMonthly: 49,
     priceAnnual: 39,
+    priceMonthlyINR: 2499,     // ₹2,499 for 30 days
+    priceAnnualINR: 24999,    // ₹24,999 for 365 days (save ~17%)
     dailyQueryLimit: 250,
     popular: true,
     description: "Comprehensive growth engine for manufacturers, exporters, and established startups.",
@@ -151,6 +157,8 @@ export const CENTRAL_PLANS: Record<SubscriptionPlanId, PlanConfig> = {
     name: "PRO",
     priceMonthly: 99,
     priceAnnual: 79,
+    priceMonthlyINR: 4999,     // ₹4,999 for 30 days
+    priceAnnualINR: 49999,    // ₹49,999 for 365 days (save ~17%)
     dailyQueryLimit: Infinity,
     description: "Unlimited enterprise trade intelligence and dedicated expansion advisory.",
     features: [
@@ -211,4 +219,27 @@ export function getDailyLimitForPlan(planId: SubscriptionPlanId): number {
 
 export function isPlanQueryUnlimited(planId: SubscriptionPlanId): boolean {
   return CENTRAL_PLANS[planId]?.dailyQueryLimit === Infinity;
+}
+
+/**
+ * Server-side source of truth for prepaid Razorpay prices (in Paise).
+ * 1 INR = 100 Paise.
+ */
+export function getPlanPriceInPaise(planId: "starter" | "business" | "pro", period: "monthly" | "yearly"): number {
+  const plan = CENTRAL_PLANS[planId];
+  if (!plan) {
+    throw new Error(`Invalid plan ID: ${planId}`);
+  }
+  const inrAmount = period === "yearly" ? plan.priceAnnualINR : plan.priceMonthlyINR;
+  if (!inrAmount || inrAmount <= 0) {
+    throw new Error(`Price not configured for plan ${planId} (${period})`);
+  }
+  return inrAmount * 100;
+}
+
+/**
+ * Returns duration in days for prepaid plan period.
+ */
+export function getPlanPeriodDays(period: "monthly" | "yearly"): number {
+  return period === "yearly" ? 365 : 30;
 }

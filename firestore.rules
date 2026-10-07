@@ -130,16 +130,33 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isValidId(agentId) && resource.data.userId == request.auth.uid;
     }
 
+    // Razorpay Payments collection: strictly readable by its authenticated owner only, NEVER writable by clients
+    match /payments/{paymentId} {
+      allow get, list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false; // Managed strictly server-side via Firebase Admin SDK
+    }
+
     // User profile document
     match /users/{userId} {
       allow get, list: if isOwner(userId) && isValidId(userId);
-      // Users can NEVER write, set or modify the 'plan' or 'role' fields themselves (managed strictly server-side / Admin SDK)
+      // Users can NEVER write, set or modify the 'plan', 'role', 'planExpiresAt', 'planPeriod', 'lastPaymentId' fields themselves
       allow create: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data, userId) &&
         !('plan' in request.resource.data) &&
         !('role' in request.resource.data) &&
-        !('isAdmin' in request.resource.data);
+        !('isAdmin' in request.resource.data) &&
+        !('planExpiresAt' in request.resource.data) &&
+        !('planPeriod' in request.resource.data) &&
+        !('lastPaymentId' in request.resource.data);
       allow update: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data, userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'role', 'isAdmin', 'planExpiresAt', 'subscriptionId']);
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'plan', 
+          'role', 
+          'isAdmin', 
+          'planExpiresAt', 
+          'planPeriod', 
+          'lastPaymentId', 
+          'subscriptionId'
+        ]);
       allow delete: if isOwner(userId) && isValidId(userId);
 
       // Private reports subcollection

@@ -22,6 +22,8 @@ interface CreditsContextType {
   user: User | null;
   isAnonymous: boolean;
   plan: SubscriptionPlanId;
+  planExpiresAt: string | null;
+  planPeriod: "monthly" | "yearly" | null;
   consultationsUsed: number;
   queriesUsedToday: number;
   dailyLimit: number;
@@ -33,6 +35,7 @@ interface CreditsContextType {
   consumeCredit: () => Promise<boolean>;
   ensureAnonymousUser: () => Promise<User>;
   upgradePlan: (newPlan: SubscriptionPlanId) => Promise<void>;
+  refreshProfile: () => Promise<void>;
   handleGoogleSignup: () => Promise<void>;
   // Modals
   isSignupModalOpen: boolean;
@@ -64,6 +67,8 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
   onNavigateToPricing,
 }) => {
   const [plan, setPlan] = useState<SubscriptionPlanId>("free");
+  const [planExpiresAt, setPlanExpiresAt] = useState<string | null>(null);
+  const [planPeriod, setPlanPeriod] = useState<"monthly" | "yearly" | null>(null);
   const [consultationsUsed, setConsultationsUsed] = useState<number>(0);
   const [queriesUsedToday, setQueriesUsedToday] = useState<number>(0);
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
@@ -76,6 +81,22 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
   const isAnonymous = Boolean(!user || user.isAnonymous);
   const dailyLimit = getDailyLimitForPlan(plan);
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    try {
+      const profile = await getUserProfile(user.uid);
+      if (profile) {
+        setPlan(profile.plan || "free");
+        setPlanExpiresAt(profile.planExpiresAt || null);
+        setPlanPeriod(profile.planPeriod || null);
+        setConsultationsUsed(profile.consultationsUsed || 0);
+        setQueriesUsedToday(profile.queriesUsedToday || 0);
+      }
+    } catch (err) {
+      console.warn("Failed to refresh user profile:", err);
+    }
+  }, [user]);
+
   // Sync profile when user changes
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -84,6 +105,8 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
       if (!user) {
         // No user yet: default state for new visitor (0 consultations used)
         setPlan("free");
+        setPlanExpiresAt(null);
+        setPlanPeriod(null);
         setConsultationsUsed(0);
         setQueriesUsedToday(0);
         setIsInitialLoading(false);
@@ -94,11 +117,15 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
         const profile = await getUserProfile(user.uid);
         if (profile) {
           setPlan(profile.plan || "free");
+          setPlanExpiresAt(profile.planExpiresAt || null);
+          setPlanPeriod(profile.planPeriod || null);
           setConsultationsUsed(profile.consultationsUsed || 0);
           setQueriesUsedToday(profile.queriesUsedToday || 0);
         } else {
           // New account or first-time
           setPlan("free");
+          setPlanExpiresAt(null);
+          setPlanPeriod(null);
           setConsultationsUsed(0);
           setQueriesUsedToday(0);
         }
@@ -106,6 +133,8 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
         // Real-time listener for profile changes in Firestore
         unsubscribe = subscribeToUserProfile(user.uid, (updatedProfile) => {
           setPlan(updatedProfile.plan || "free");
+          setPlanExpiresAt(updatedProfile.planExpiresAt || null);
+          setPlanPeriod(updatedProfile.planPeriod || null);
           setConsultationsUsed(updatedProfile.consultationsUsed || 0);
           setQueriesUsedToday(updatedProfile.queriesUsedToday || 0);
         });
@@ -280,6 +309,8 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
         user,
         isAnonymous,
         plan,
+        planExpiresAt,
+        planPeriod,
         consultationsUsed,
         queriesUsedToday,
         dailyLimit,
@@ -291,6 +322,7 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
         consumeCredit,
         ensureAnonymousUser,
         upgradePlan,
+        refreshProfile,
         handleGoogleSignup,
         isSignupModalOpen,
         openSignupModal,

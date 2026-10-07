@@ -179,6 +179,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       items: [
         { id: "plans-usage", label: "Plans & Usage", icon: Zap, tab: "pricing" as ActiveTab },
         { id: "pricing", label: "Pricing", icon: CreditCard, tab: "pricing" as ActiveTab },
+        { id: "billing", label: "Billing & Invoices", icon: FileText, tab: "billing" as ActiveTab },
         { id: "account-settings", label: "Settings", icon: SettingsIcon, tab: "agent" as ActiveTab, section: "settings" },
         { id: "profile", label: "Profile", icon: UserIcon, tab: "dashboard" as ActiveTab },
       ],

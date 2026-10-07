@@ -128,9 +128,23 @@ export async function verifyAuthToken(req: any): Promise<AuthenticatedUser> {
       if (db) {
         const userDoc = await db.collection("users").doc(uid).get();
         if (userDoc.exists) {
-          const rawPlan = (userDoc.data()?.plan || "free").toString().toLowerCase();
-          if (["free", "starter", "business", "pro"].includes(rawPlan)) {
+          const userData = userDoc.data();
+          const rawPlan = (userData?.plan || "free").toString().toLowerCase();
+          const planExpiresAt = userData?.planExpiresAt;
+
+          // Expiry check: if plan is paid but planExpiresAt is in the past, treat plan as "free"
+          let isExpired = false;
+          if (rawPlan !== "free" && planExpiresAt) {
+            const expiryTime = new Date(planExpiresAt).getTime();
+            if (!isNaN(expiryTime) && Date.now() > expiryTime) {
+              isExpired = true;
+            }
+          }
+
+          if (!isExpired && ["free", "starter", "business", "pro"].includes(rawPlan)) {
             plan = rawPlan as SubscriptionPlanId;
+          } else {
+            plan = "free";
           }
         }
       }

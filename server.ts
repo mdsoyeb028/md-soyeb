@@ -42,6 +42,9 @@ import customerAgentLeadHandler from "./src/server/api/customer-agent-lead.ts";
 import customerAgentAppointmentHandler from "./src/server/api/customer-agent-appointment.ts";
 import customerAgentChatHandler from "./src/server/api/customer-agent-chat.ts";
 import customerAgentVoiceHandler from "./src/server/api/customer-agent-voice.ts";
+import paymentsCreateOrderHandler from "./src/server/api/payments-create-order.ts";
+import paymentsVerifyHandler from "./src/server/api/payments-verify.ts";
+import paymentsWebhookHandler from "./src/server/api/payments-webhook.ts";
 
 dotenv.config();
 
@@ -58,6 +61,17 @@ app.use(
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: false, // Disabled to prevent blocking Google Auth, Firebase CDN, and AI provider streams
   })
+);
+
+// Razorpay Webhook requires RAW request body for cryptographic signature verification.
+// Must be registered BEFORE express.json()
+app.post(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" }),
+  async (req: Request, res: Response) => {
+    (req as any).rawBody = req.body;
+    await paymentsWebhookHandler(req, res);
+  }
 );
 
 // Handle serverless runtimes (e.g. Vercel) where req.body has already been buffered/parsed
@@ -567,6 +581,15 @@ app.post("/api/ai/customer-agent-lead", async (req, res) => {
 // Real AI Customer Agent Appointment Endpoint
 app.post("/api/ai/customer-agent-appointment", async (req, res) => {
   await customerAgentAppointmentHandler(req, res);
+});
+
+// Razorpay Payments & Subscriptions Endpoints
+app.post("/api/payments/create-order", async (req, res) => {
+  await paymentsCreateOrderHandler(req, res);
+});
+
+app.post("/api/payments/verify", async (req, res) => {
+  await paymentsVerifyHandler(req, res);
 });
 
 // Agent Tool Execution

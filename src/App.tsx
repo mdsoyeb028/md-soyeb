@@ -33,6 +33,7 @@ const ExportView = lazy(() => import("./components/ExportView").then(m => ({ def
 const BusinessView = lazy(() => import("./components/BusinessView").then(m => ({ default: m.BusinessView })));
 const DashboardView = lazy(() => import("./components/DashboardView").then(m => ({ default: m.DashboardView })));
 const PricingView = lazy(() => import("./components/PricingView").then(m => ({ default: m.PricingView })));
+const BillingView = lazy(() => import("./components/BillingView").then(m => ({ default: m.BillingView })));
 const TrafficPerformanceView = lazy(() => import("./components/TrafficPerformanceView").then(m => ({ default: m.TrafficPerformanceView })));
 const BusinessAgentCenter = lazy(() => import("./components/BusinessAgentCenter").then(m => ({ default: m.BusinessAgentCenter })));
 const CustomerAgentCenter = lazy(() => import("./components/CustomerAgentCenter").then(m => ({ default: m.CustomerAgentCenter })));
@@ -446,6 +447,10 @@ export default function App() {
 
                       {activeTab === "pricing" && (
                         <PricingView setActiveTab={setActiveTab} />
+                      )}
+
+                      {activeTab === "billing" && (
+                        <BillingView setActiveTab={setActiveTab} />
                       )}
                     </Suspense>
                   )}

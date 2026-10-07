@@ -93,3 +93,19 @@ export const SocialRequestSchema = z.object({
   language: z.string().max(50).optional(),
   languageName: z.string().max(50).optional(),
 });
+
+// --- 7. Payments & Subscriptions (Razorpay) ---
+export const CreateOrderSchema = z.object({
+  planId: z.enum(["starter", "business", "pro"], {
+    message: "planId must be one of 'starter', 'business', or 'pro'",
+  }),
+  period: z.enum(["monthly", "yearly"], {
+    message: "period must be 'monthly' or 'yearly'",
+  }),
+});
+
+export const VerifyPaymentSchema = z.object({
+  razorpay_order_id: z.string().min(1, "razorpay_order_id is required").max(100),
+  razorpay_payment_id: z.string().min(1, "razorpay_payment_id is required").max(100),
+  razorpay_signature: z.string().min(1, "razorpay_signature is required").max(256),
+});

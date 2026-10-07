@@ -1,4 +1,4 @@
-export type ActiveTab = "home" | "agent" | "customer-agent" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing" | "analysis";
+export type ActiveTab = "home" | "agent" | "customer-agent" | "traffic" | "seo" | "social" | "export" | "business" | "dashboard" | "pricing" | "billing" | "analysis";
 
 export interface SavedItem {
   id: string;
@@ -854,6 +854,8 @@ export interface PlanConfig {
   name: string;
   priceMonthly: number;
   priceAnnual: number;
+  priceMonthlyINR: number;
+  priceAnnualINR: number;
   dailyQueryLimit: number;
   popular?: boolean;
   description: string;
@@ -868,6 +870,9 @@ export interface UserCreditsProfile {
   displayName?: string | null;
   photoURL?: string | null;
   plan: SubscriptionPlanId;
+  planExpiresAt?: string | null;
+  planPeriod?: "monthly" | "yearly" | null;
+  lastPaymentId?: string | null;
   isAnonymous: boolean;
   consultationsUsed: number;
   queriesUsedToday: number;
@@ -882,6 +887,8 @@ export interface PricingPlan {
   name: string;
   priceMonthly: number;
   priceAnnual: number;
+  priceMonthlyINR?: number;
+  priceAnnualINR?: number;
   popular?: boolean;
   description: string;
   features: string[];
