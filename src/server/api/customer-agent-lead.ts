@@ -1,5 +1,25 @@
 import { parseRequestBody, sendJsonResponse } from "../serverlessHttp.ts";
 import { normalizeServerErrorMessage } from "../aiProvider.ts";
+import { CustomerLeadSchema } from "../schemas.ts";
+import { getAdminFirestore } from "../auth.ts";
+import { loadVerifiedCustomerAgent } from "../customerAgentLoader.ts";
+
+// Simple in-memory IP rate limiter for leads to prevent form spam: max 5 leads/min per IP
+const leadIpRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkLeadRateLimit(clientIp: string): boolean {
+  const now = Date.now();
+  const entry = leadIpRateLimit.get(clientIp);
+  if (!entry || now > entry.resetAt) {
+    leadIpRateLimit.set(clientIp, { count: 1, resetAt: now + 60000 });
+    return true;
+  }
+  if (entry.count >= 5) {
+    return false;
+  }
+  entry.count += 1;
+  return true;
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -22,17 +42,36 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  try {
-    const body = await parseRequestBody(req);
-    const { agentId, name, email, phone, requirement, serviceOrProduct, source = "website_widget" } = body || {};
+  const clientIp = (req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "unknown")
+    .toString()
+    .split(",")[0]
+    .trim();
 
-    if (!agentId) {
-      sendJsonResponse(res, 400, { success: false, error: "agentId is required." });
+  if (!checkLeadRateLimit(clientIp)) {
+    sendJsonResponse(res, 429, {
+      success: false,
+      error: "Too many lead submissions. Please wait a moment before submitting again.",
+    });
+    return;
+  }
+
+  try {
+    const rawBody = await parseRequestBody(req);
+    const parsed = CustomerLeadSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const errorMsg = parsed.error.issues[0]?.message || "Invalid lead details.";
+      sendJsonResponse(res, 400, { success: false, error: errorMsg });
       return;
     }
 
-    if (!name && !email && !phone) {
-      sendJsonResponse(res, 400, { success: false, error: "At least one contact field (name, email, or phone) is required." });
+    const { agentId, name, email, phone, requirement, serviceOrProduct, source } = parsed.data;
+
+    // 1. Verify that the agent exists and fetch owner UID
+    const { ownerUid, config } = await loadVerifiedCustomerAgent(agentId);
+
+    const db = getAdminFirestore();
+    if (!db) {
+      sendJsonResponse(res, 503, { success: false, error: "Database service unavailable." });
       return;
     }
 
@@ -47,18 +86,53 @@ export default async function handler(req: any, res: any) {
       phone: (phone || "").trim(),
       requirement: (requirement || "Customer inquiry through website widget").trim(),
       serviceOrProduct: (serviceOrProduct || "").trim(),
-      source,
+      source: source || "website_widget",
       status: "NEW",
       createdAt: now,
       lastContactAt: now,
     };
 
+    // 2. Persist directly into the business owner's customerLeads subcollection using firebase-admin
+    await db
+      .collection("users")
+      .doc(ownerUid)
+      .collection("agents")
+      .doc(agentId)
+      .collection("customerLeads")
+      .doc(leadId)
+      .set(createdLead);
+
+    // 3. In-app notification task for the owner
+    try {
+      const notifId = `task_lead_${Date.now()}`;
+      await db
+        .collection("users")
+        .doc(ownerUid)
+        .collection("agents")
+        .doc(agentId)
+        .collection("tasks")
+        .doc(notifId)
+        .set({
+          id: notifId,
+          userId: ownerUid,
+          agentId,
+          title: `New Customer Lead: ${createdLead.name}`,
+          description: `Contact: ${createdLead.email || createdLead.phone || "N/A"}. Requirement: ${createdLead.requirement}`,
+          status: "TODO",
+          createdAt: now,
+          updatedAt: now,
+        });
+    } catch (notifErr) {
+      console.warn("Could not create owner notification task:", notifErr);
+    }
+
     sendJsonResponse(res, 200, {
       success: true,
       lead: createdLead,
-      message: "Lead recorded successfully. The business team has been notified.",
+      message: `Lead recorded successfully. The team at ${config.businessName} has been notified.`,
     });
   } catch (err: unknown) {
+    console.error("Error creating customer lead:", err);
     sendJsonResponse(res, 500, { success: false, error: normalizeServerErrorMessage(err) });
   }
 }

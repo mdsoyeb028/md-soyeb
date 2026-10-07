@@ -1,7 +1,6 @@
-import dns from "dns/promises";
-import { parse } from "node-html-parser";
 import { performRealSeoAudit } from "./seoCrawler.ts";
 import { generateAICompletion } from "./aiProvider.ts";
+import { validatePublicUrl } from "./ssrfGuard.ts";
 import { 
   BusinessUrlPlatform, 
   MultiPresenceAnalysisResult, 
@@ -18,45 +17,6 @@ import {
 export interface LinkToAnalyze {
   url: string;
   platform?: BusinessUrlPlatform;
-}
-
-// IP Range SSRF check helper for public requests
-function isPrivateOrReservedIp(ip: string): boolean {
-  if (ip.includes(".")) {
-    const parts = ip.split(".").map(Number);
-    if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) return true;
-    const [a, b] = parts;
-    if (a === 127 || a === 0 || a === 10) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true;
-    if (a >= 224) return true;
-    return false;
-  }
-  const lower = ip.toLowerCase();
-  return lower === "::1" || lower === "::";
-}
-
-async function validatePublicUrl(targetUrl: string): Promise<string> {
-  const parsed = new URL(targetUrl);
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Only HTTP and HTTPS protocols are supported.");
-  }
-  const hostname = parsed.hostname;
-  if (!hostname || hostname === "localhost") {
-    throw new Error("Invalid hostname.");
-  }
-  const addresses = await dns.lookup(hostname, { all: true });
-  if (!addresses || addresses.length === 0) {
-    throw new Error(`DNS resolution failed for hostname "${hostname}".`);
-  }
-  for (const addr of addresses) {
-    if (isPrivateOrReservedIp(addr.address)) {
-      throw new Error(`Access to private network or reserved IP address "${addr.address}" is strictly restricted.`);
-    }
-  }
-  return targetUrl;
 }
 
 /**

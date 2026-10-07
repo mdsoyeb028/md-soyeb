@@ -185,7 +185,7 @@ async function safeFetchWebpage(targetUrl: URL): Promise<{
 
     const startTime = performance.now();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const response = await fetch(currentUrl.toString(), {
@@ -212,7 +212,7 @@ async function safeFetchWebpage(targetUrl: URL): Promise<{
         continue;
       }
 
-      // Read response body with maximum limit (2.5 MB)
+      // Read response body with maximum limit (2 MB)
       let text = "";
       const reader = response.body?.getReader();
       if (!reader) {
@@ -220,7 +220,7 @@ async function safeFetchWebpage(targetUrl: URL): Promise<{
       } else {
         const chunks: Uint8Array[] = [];
         let totalBytes = 0;
-        const MAX_BYTES = 2.5 * 1024 * 1024;
+        const MAX_BYTES = 2.0 * 1024 * 1024;
 
         while (true) {
           const { done, value } = await reader.read();

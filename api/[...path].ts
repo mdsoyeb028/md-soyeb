@@ -18,6 +18,8 @@ import plansHandler from "../src/server/api/plans.ts";
 import indexHandler from "../src/server/api/index.ts";
 import customerAgentChatHandler from "../src/server/api/customer-agent-chat.ts";
 import customerAgentVoiceHandler from "../src/server/api/customer-agent-voice.ts";
+import customerAgentLeadHandler from "../src/server/api/customer-agent-lead.ts";
+import customerAgentAppointmentHandler from "../src/server/api/customer-agent-appointment.ts";
 
 function extractCleanPath(req: any): string {
   // Check req.query.path if Vercel populated catch-all query parameter
@@ -94,6 +96,12 @@ export default async function handler(req: any, res: any) {
 
       case "/ai/customer-agent-voice":
         return await customerAgentVoiceHandler(req, res);
+
+      case "/ai/customer-agent-lead":
+        return await customerAgentLeadHandler(req, res);
+
+      case "/ai/customer-agent-appointment":
+        return await customerAgentAppointmentHandler(req, res);
 
       // Core Strategic Tools Endpoints
       case "/ai/seo":

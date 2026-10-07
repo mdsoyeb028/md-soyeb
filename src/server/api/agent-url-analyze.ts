@@ -10,6 +10,7 @@ import {
   detectUrlPlatform 
 } from "../presenceAnalyzer.ts";
 import { normalizeServerErrorMessage } from "../aiProvider.ts";
+import { UrlInputSchema } from "../schemas.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -33,14 +34,15 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const body = await parseRequestBody(req);
-    const { url } = body || {};
-
-    if (!url || typeof url !== "string" || !url.trim()) {
-      sendJsonResponse(res, 400, { success: false, error: "URL is required for analysis." });
+    const rawBody = await parseRequestBody(req);
+    const parsed = UrlInputSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const errMsg = parsed.error.issues[0]?.message || "Invalid URL parameter.";
+      sendJsonResponse(res, 400, { success: false, error: errMsg });
       return;
     }
 
+    const { url } = parsed.data;
     const cleanUrl = url.trim();
     const detected = detectUrlPlatform(cleanUrl);
     const platform = detected.platform;

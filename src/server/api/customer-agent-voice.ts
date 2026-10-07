@@ -7,6 +7,8 @@ import {
   getProviderQuotaErrorMessage 
 } from "../planEnforcement.ts";
 import { normalizeServerErrorMessage } from "../aiProvider.ts";
+import { CustomerAgentVoiceSchema } from "../schemas.ts";
+import { loadVerifiedCustomerAgent, sanitizeVisitorInput } from "../customerAgentLoader.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -29,35 +31,39 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const rawBody = await parseRequestBody(req);
+  const parseResult = CustomerAgentVoiceSchema.safeParse(rawBody);
+  if (!parseResult.success) {
+    const errorMsg = parseResult.error.issues[0]?.message || "Invalid voice request parameters.";
+    sendJsonResponse(res, 400, { success: false, error: errorMsg });
+    return;
+  }
+
+  const { agentId, callerAudioTranscript, conversationHistory } = parseResult.data;
+
   const planCheck = await enforcePlanLimit(req, res);
   if (!planCheck.allowed) return;
 
   try {
-    const body = await parseRequestBody(req);
-    const { 
-      agentId, 
-      callerAudioTranscript, 
-      customerConfig, 
-      conversationHistory, 
-      knowledgeItems,
-      businessContext 
-    } = body || {};
+    // 1. Strictly load agent configuration and verified knowledge items from Firestore using firebase-admin
+    const { config, knowledgeItems } = await loadVerifiedCustomerAgent(agentId);
 
-    if (!callerAudioTranscript || !callerAudioTranscript.trim()) {
-      await refundUsage(planCheck.key);
-      sendJsonResponse(res, 400, { success: false, error: "Caller audio transcript is required." });
-      return;
-    }
+    // 2. Sanitize visitor input
+    const sanitizedTranscript = sanitizeVisitorInput(callerAudioTranscript);
 
     const hasTwilioCredentials = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
 
-    // Run AI employee conversation handling
+    // 3. Run AI employee conversation handling
     const chatRes = await handleCustomerAgentChat({
-      message: callerAudioTranscript,
+      message: sanitizedTranscript,
       conversationHistory: conversationHistory || [],
-      customerConfig: customerConfig || { agentId, agentName: "AI Voice Employee", tone: "Professional" },
-      knowledgeItems: knowledgeItems || [],
-      businessContext: businessContext || {},
+      customerConfig: config,
+      knowledgeItems,
+      businessContext: {
+        name: config.businessName,
+        description: config.businessDescription,
+      },
+      language: config.language || "English",
     });
 
     sendJsonResponse(res, 200, {
@@ -70,14 +76,19 @@ export default async function handler(req: any, res: any) {
       telephonyStatus: hasTwilioCredentials ? "ACTIVE_TWILIO_TRUNK" : "PHONE_PROVIDER_NOT_CONNECTED",
       telephonyNotice: hasTwilioCredentials 
         ? "Telephony provider connected" 
-        : "Phone provider not connected — connect Twilio or SIP provider in Integrations to receive live phone calls.",
+        : "Demo Mode (In-Browser Simulation) — Phone provider not connected. Connect Twilio or SIP provider in Integrations to receive live phone calls.",
     });
   } catch (err: unknown) {
     await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
-      sendJsonResponse(res, 429, { success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      sendJsonResponse(res, 429, { 
+        success: false, 
+        error: "provider_quota_reached", 
+        message: getProviderQuotaErrorMessage() 
+      });
       return;
     }
+    console.error("Error in customer-agent-voice:", err);
     sendJsonResponse(res, 500, { 
       success: false, 
       error: normalizeServerErrorMessage(err)

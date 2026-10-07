@@ -1,4 +1,5 @@
 import { parse } from "node-html-parser";
+import { safeFetch } from "./ssrfGuard.ts";
 
 /**
  * Real Traffic Analytics & Multi-Source Performance Engine
@@ -231,24 +232,20 @@ export async function inspectWebsiteTracking(targetUrl: string): Promise<RealWeb
   };
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6500);
-
-    const res = await fetch(url, {
-      signal: controller.signal,
+    const safeRes = await safeFetch(url, {
+      timeoutMs: 8000,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; BusinessDiagnosticSystem/1.0; +https://md-soyeb.vercel.app/bot)",
         Accept: "text/html,application/xhtml+xml",
       },
     });
-    clearTimeout(timeout);
 
-    if (!res.ok) {
-      result.statusMessage = `HTTP ${res.status}: Target website returned error.`;
+    if (safeRes.status >= 400) {
+      result.statusMessage = `HTTP ${safeRes.status}: Target website returned error.`;
       return result;
     }
 
-    const html = await res.text();
+    const html = safeRes.text();
     const root = parse(html);
 
     // Extract Title & Meta Description
@@ -361,11 +358,12 @@ export async function inspectYouTubePublic(targetUrl: string): Promise<RealYouTu
     // 2. Fetch public HTML for video views or publish date if it is a video
     if (!isChannel) {
       try {
-        const vidRes = await fetch(targetUrl, {
+        const vidSafeRes = await safeFetch(targetUrl, {
+          timeoutMs: 8000,
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
         });
-        if (vidRes.ok) {
-          const html = await vidRes.text();
+        if (vidSafeRes.status === 200) {
+          const html = vidSafeRes.text();
           const viewMatch = html.match(/"viewCount":"(\d+)"/) || html.match(/([\d,]+)\s+views/i);
           if (viewMatch && viewMatch[1]) {
             result.views = `${parseInt(viewMatch[1].replace(/,/g, ""), 10).toLocaleString()} views`;
@@ -405,15 +403,16 @@ export async function inspectStoreListing(targetUrl: string): Promise<RealStoreL
   };
 
   try {
-    const res = await fetch(targetUrl, {
+    const safeRes = await safeFetch(targetUrl, {
+      timeoutMs: 8000,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept: "text/html",
       },
     });
 
-    if (res.ok) {
-      const html = await res.text();
+    if (safeRes.status === 200) {
+      const html = safeRes.text();
       const root = parse(html);
       result.isPubliclyAccessible = true;
 

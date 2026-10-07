@@ -20,7 +20,10 @@ service cloud.firestore {
     }
 
     function isValidUser(data, userId) {
-      return data.uid == userId && (data.email is string || data.email == null);
+      return data.uid == userId && 
+        (data.email is string || data.email == null) &&
+        (!('email' in data) || data.email == null || data.email.size() <= 200) &&
+        (!('displayName' in data) || data.displayName == null || data.displayName.size() <= 150);
     }
 
     function isValidReport(data, userId) {
@@ -34,7 +37,10 @@ service cloud.firestore {
       return data.userId == userId &&
         data.id is string && data.id.size() <= 128 &&
         (data.name is string || data.businessName is string) &&
-        data.industry is string;
+        data.industry is string &&
+        (!('name' in data) || data.name.size() <= 200) &&
+        (!('businessName' in data) || data.businessName.size() <= 200) &&
+        data.industry.size() <= 100;
     }
 
     function isValidTask(data, userId) {
@@ -48,116 +54,189 @@ service cloud.firestore {
       return data.isPublic == true &&
         data.id is string && data.id.size() <= 128 &&
         (data.name is string || data.businessName is string) &&
-        data.industry is string;
+        data.industry is string &&
+        (!('name' in data) || data.name.size() <= 200) &&
+        (!('businessName' in data) || data.businessName.size() <= 200);
+    }
+
+    function isValidPublicCustomerAgent(data, userId) {
+      return data.userId == userId &&
+        data.agentId is string && data.agentId.size() <= 128 &&
+        data.enabled is bool &&
+        data.agentName is string && data.agentName.size() <= 150 &&
+        data.businessName is string && data.businessName.size() <= 150 &&
+        (!('tone' in data) || data.tone.size() <= 100) &&
+        (!('language' in data) || data.language.size() <= 50) &&
+        (!('businessDescription' in data) || data.businessDescription.size() <= 2000) &&
+        (!('welcomeMessage' in data) || data.welcomeMessage.size() <= 500);
+    }
+
+    function isValidConversation(data) {
+      return data.id is string && data.id.size() <= 128 &&
+        (!('title' in data) || data.title.size() <= 200);
+    }
+
+    function isValidDocument(data) {
+      return data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() <= 300 &&
+        (!('type' in data) || data.type.size() <= 50);
+    }
+
+    function isValidCustomerKnowledge(data) {
+      return data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() <= 200 &&
+        data.content is string && data.content.size() <= 10000 &&
+        data.type in ['faq', 'policy', 'product', 'service', 'general'] &&
+        data.state in ['READY', 'PROCESSING', 'ERROR'];
+    }
+
+    function isValidCustomerLead(data) {
+      return data.id is string && data.id.size() <= 128 &&
+        (!('name' in data) || data.name.size() <= 100) &&
+        (!('email' in data) || data.email.size() <= 200) &&
+        (!('phone' in data) || data.phone.size() <= 50) &&
+        (!('requirement' in data) || data.requirement.size() <= 1000) &&
+        (!('serviceOrProduct' in data) || data.serviceOrProduct.size() <= 200) &&
+        data.status in ['NEW', 'CONTACTED', 'QUALIFIED', 'LOST', 'CLOSED'];
+    }
+
+    function isValidCustomerAppointment(data) {
+      return data.id is string && data.id.size() <= 128 &&
+        data.customerName is string && data.customerName.size() <= 100 &&
+        (!('customerEmail' in data) || data.customerEmail.size() <= 200) &&
+        (!('customerPhone' in data) || data.customerPhone.size() <= 50) &&
+        (!('service' in data) || data.service.size() <= 200) &&
+        (!('preferredDate' in data) || data.preferredDate.size() <= 100) &&
+        (!('preferredTime' in data) || data.preferredTime.size() <= 100) &&
+        (!('notes' in data) || data.notes.size() <= 1000) &&
+        data.status in ['REQUESTED', 'CONFIRMED', 'CANCELLED', 'COMPLETED'];
     }
 
     // Controlled Public Agents collection (only explicitly approved public info displayed)
     match /public_agents/{agentId} {
       allow get: if resource.data.isPublic == true;
       allow list: if false; // prevent directory scraping
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidPublicAgent(request.resource.data);
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(agentId) && request.resource.data.userId == request.auth.uid && isValidPublicAgent(request.resource.data);
+      allow update: if isSignedIn() && isValidId(agentId) && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid && isValidPublicAgent(request.resource.data);
+      allow delete: if isSignedIn() && isValidId(agentId) && resource.data.userId == request.auth.uid;
     }
 
     // Controlled Public Customer Agents collection for website widgets (strictly approved public branding)
     match /public_customer_agents/{agentId} {
       allow get: if resource.data.enabled == true;
       allow list: if false; // prevent directory scraping
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(agentId) && request.resource.data.userId == request.auth.uid && isValidPublicCustomerAgent(request.resource.data, request.auth.uid);
+      allow update: if isSignedIn() && isValidId(agentId) && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid && isValidPublicCustomerAgent(request.resource.data, request.auth.uid);
+      allow delete: if isSignedIn() && isValidId(agentId) && resource.data.userId == request.auth.uid;
     }
 
     // User profile document
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      // Users cannot write or modify the 'plan' field themselves (managed strictly server-side / Admin SDK)
-      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId) &&
-        !('plan' in request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data, userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan']);
-      allow delete: if isOwner(userId);
+      allow get, list: if isOwner(userId) && isValidId(userId);
+      // Users can NEVER write, set or modify the 'plan' or 'role' fields themselves (managed strictly server-side / Admin SDK)
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data, userId) &&
+        !('plan' in request.resource.data) &&
+        !('role' in request.resource.data) &&
+        !('isAdmin' in request.resource.data);
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUser(request.resource.data, userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'role', 'isAdmin', 'planExpiresAt', 'subscriptionId']);
+      allow delete: if isOwner(userId) && isValidId(userId);
 
       // Private reports subcollection
       match /reports/{reportId} {
         allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidReport(request.resource.data, userId);
-        allow update: if isOwner(userId) && isValidReport(request.resource.data, userId) &&
+        allow create: if isOwner(userId) && isValidId(reportId) && isValidReport(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidId(reportId) && isValidReport(request.resource.data, userId) &&
           request.resource.data.userId == resource.data.userId;
-        allow delete: if isOwner(userId);
+        allow delete: if isOwner(userId) && isValidId(reportId);
       }
 
       // Private custom AI business agents subcollection
       match /agents/{agentId} {
         allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidAgent(request.resource.data, userId);
-        allow update: if isOwner(userId) && isValidAgent(request.resource.data, userId) &&
+        allow create: if isOwner(userId) && isValidId(agentId) && isValidAgent(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidId(agentId) && isValidAgent(request.resource.data, userId) &&
           request.resource.data.userId == resource.data.userId;
-        allow delete: if isOwner(userId);
+        allow delete: if isOwner(userId) && isValidId(agentId);
 
         // Nested subcollections per agent for complete data isolation
         match /conversations/{conversationId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidId(conversationId) && isValidConversation(request.resource.data);
+          allow delete: if isOwner(userId) && isValidId(conversationId);
         }
 
         match /tasks/{taskId} {
           allow get, list: if isOwner(userId);
-          allow create: if isOwner(userId) && isValidTask(request.resource.data, userId);
-          allow update: if isOwner(userId) && isValidTask(request.resource.data, userId) &&
+          allow create: if isOwner(userId) && isValidId(taskId) && isValidTask(request.resource.data, userId);
+          allow update: if isOwner(userId) && isValidId(taskId) && isValidTask(request.resource.data, userId) &&
             request.resource.data.userId == resource.data.userId;
-          allow delete: if isOwner(userId);
+          allow delete: if isOwner(userId) && isValidId(taskId);
         }
 
         match /reports/{reportId} {
           allow get, list: if isOwner(userId);
-          allow create: if isOwner(userId) && isValidReport(request.resource.data, userId);
-          allow update: if isOwner(userId) && isValidReport(request.resource.data, userId) &&
+          allow create: if isOwner(userId) && isValidId(reportId) && isValidReport(request.resource.data, userId);
+          allow update: if isOwner(userId) && isValidId(reportId) && isValidReport(request.resource.data, userId) &&
             request.resource.data.userId == resource.data.userId;
-          allow delete: if isOwner(userId);
+          allow delete: if isOwner(userId) && isValidId(reportId);
         }
 
         match /documents/{documentId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidId(documentId) && isValidDocument(request.resource.data);
+          allow delete: if isOwner(userId) && isValidId(documentId);
         }
 
         // AI Customer Agent subcollections for the business owner
         match /customerAgent/{docId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list, create, update, delete: if isOwner(userId) && isValidId(docId);
         }
 
+        // Leads: Logged-in owner can view, manage, update and delete
+        // (Public visitors submit via serverless API which uses firebase-admin to validate & persist)
         match /customerLeads/{leadId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidId(leadId) && isValidCustomerLead(request.resource.data);
+          allow delete: if isOwner(userId) && isValidId(leadId);
         }
 
+        // Appointments: Logged-in owner can view, manage, confirm and delete
+        // (Public visitors book via serverless API which uses firebase-admin to validate & persist)
         match /customerAppointments/{appointmentId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidId(appointmentId) && isValidCustomerAppointment(request.resource.data);
+          allow delete: if isOwner(userId) && isValidId(appointmentId);
         }
 
         match /customerConversations/{conversationId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidId(conversationId) && isValidConversation(request.resource.data);
+          allow delete: if isOwner(userId) && isValidId(conversationId);
         }
 
         match /customerKnowledge/{knowledgeId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidId(knowledgeId) && isValidCustomerKnowledge(request.resource.data);
+          allow delete: if isOwner(userId) && isValidId(knowledgeId);
         }
 
         match /customerAutomations/{automationId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list, create, update, delete: if isOwner(userId) && isValidId(automationId);
         }
 
         match /customerIntegrations/{integrationId} {
-          allow get, list, create, update, delete: if isOwner(userId);
+          allow get, list, create, update, delete: if isOwner(userId) && isValidId(integrationId);
         }
       }
 
       // Private tasks & external action approvals subcollection (top-level)
       match /tasks/{taskId} {
         allow get, list: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidTask(request.resource.data, userId);
-        allow update: if isOwner(userId) && isValidTask(request.resource.data, userId) &&
+        allow create: if isOwner(userId) && isValidId(taskId) && isValidTask(request.resource.data, userId);
+        allow update: if isOwner(userId) && isValidId(taskId) && isValidTask(request.resource.data, userId) &&
           request.resource.data.userId == resource.data.userId;
-        allow delete: if isOwner(userId);
+        allow delete: if isOwner(userId) && isValidId(taskId);
       }
     }
   }

@@ -7,6 +7,9 @@ import {
   isProviderQuotaError, 
   getProviderQuotaErrorMessage 
 } from "../planEnforcement.ts";
+import { CustomerAgentChatSchema } from "../schemas.ts";
+import { loadVerifiedCustomerAgent, sanitizeVisitorInput } from "../customerAgentLoader.ts";
+import { getAdminFirestore } from "../auth.ts";
 
 export default async function handler(req: any, res: any) {
   if (req.method === "OPTIONS") {
@@ -29,38 +32,37 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const rawBody = await parseRequestBody(req);
+  const parseResult = CustomerAgentChatSchema.safeParse(rawBody);
+  if (!parseResult.success) {
+    const errorMsg = parseResult.error.issues[0]?.message || "Invalid request parameters.";
+    sendJsonResponse(res, 400, { success: false, error: errorMsg });
+    return;
+  }
+
+  const { agentId, message, conversationHistory, language } = parseResult.data;
+
+  // Rate limiting / quota check
   const planCheck = await enforcePlanLimit(req, res);
   if (!planCheck.allowed) return;
 
   try {
-    const body = await parseRequestBody(req);
-    const { 
-      message, 
-      customerConfig, 
-      conversationHistory, 
-      knowledgeItems, 
-      businessContext, 
-      language
-    } = body || {};
+    // 1. Strictly load agent configuration and verified knowledge items from Firestore using firebase-admin
+    const { config, knowledgeItems } = await loadVerifiedCustomerAgent(agentId);
 
-    if (!message || typeof message !== "string" || !message.trim()) {
-      await refundUsage(planCheck.key);
-      sendJsonResponse(res, 400, { success: false, error: "Customer message is required." });
-      return;
-    }
+    // 2. Sanitize visitor message
+    const sanitizedMsg = sanitizeVisitorInput(message);
 
-    if (!customerConfig || !customerConfig.agentId) {
-      await refundUsage(planCheck.key);
-      sendJsonResponse(res, 400, { success: false, error: "Customer agent configuration is required." });
-      return;
-    }
-
+    // 3. Execute AI response with strict server-loaded knowledge and prompt injection guard
     const chatRes = await handleCustomerAgentChat({
-      message: message.trim(),
-      customerConfig,
+      message: sanitizedMsg,
+      customerConfig: config,
       conversationHistory,
       knowledgeItems,
-      businessContext,
+      businessContext: {
+        name: config.businessName,
+        description: config.businessDescription,
+      },
       language,
     });
 
@@ -68,9 +70,17 @@ export default async function handler(req: any, res: any) {
   } catch (err: unknown) {
     await refundUsage(planCheck.key);
     if (isProviderQuotaError(err)) {
-      sendJsonResponse(res, 429, { success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
+      sendJsonResponse(res, 429, { 
+        success: false, 
+        error: "provider_quota_reached", 
+        message: getProviderQuotaErrorMessage() 
+      });
       return;
     }
-    sendJsonResponse(res, 500, { success: false, error: normalizeServerErrorMessage(err) });
+    console.error("Error in customer-agent-chat:", err);
+    sendJsonResponse(res, 500, { 
+      success: false, 
+      error: normalizeServerErrorMessage(err) 
+    });
   }
 }

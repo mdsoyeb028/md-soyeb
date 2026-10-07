@@ -37,6 +37,11 @@ import { executeAgentTool, SupportedAgentTool } from "./src/server/agentToolDisp
 import { parseBusinessDocument } from "./src/server/documentParser.ts";
 import { handleCustomerAgentChat } from "./src/server/customerAgentChatHandler.ts";
 import { CENTRAL_PLANS } from "./src/data/plans.ts";
+import helmet from "helmet";
+import customerAgentLeadHandler from "./src/server/api/customer-agent-lead.ts";
+import customerAgentAppointmentHandler from "./src/server/api/customer-agent-appointment.ts";
+import customerAgentChatHandler from "./src/server/api/customer-agent-chat.ts";
+import customerAgentVoiceHandler from "./src/server/api/customer-agent-voice.ts";
 
 dotenv.config();
 
@@ -44,6 +49,16 @@ const app = express();
 const PORT = 3000;
 
 app.set("trust proxy", 1);
+
+// Security Headers via Helmet
+// Configured to NOT break Firebase Google sign-in popups, iframe embedding, or third-party fonts/images
+app.use(
+  helmet({
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: false, // Disabled to prevent blocking Google Auth, Firebase CDN, and AI provider streams
+  })
+);
 
 // Handle serverless runtimes (e.g. Vercel) where req.body has already been buffered/parsed
 app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -197,9 +212,7 @@ app.get("/robots.txt", (_req, res) => {
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
-    hasGroqKey: Boolean(process.env.GROQ_API_KEY),
-    hasOpenRouterKey: Boolean(process.env.OPENROUTER_API_KEY),
+    healthy: true,
     timestamp: new Date().toISOString(),
   });
 });
@@ -538,103 +551,22 @@ app.post("/api/ai/agent-chat", async (req, res) => {
 
 // Real AI Customer Agent Chat Endpoint (Widget & Private Console)
 app.post("/api/ai/customer-agent-chat", async (req, res) => {
-  const planCheck = await enforcePlanLimit(req, res);
-  if (!planCheck.allowed) return;
-
-  try {
-    const { 
-      message, 
-      customerConfig, 
-      conversationHistory, 
-      knowledgeItems, 
-      businessContext, 
-      language
-    } = req.body || {};
-
-    if (!message || typeof message !== "string" || !message.trim()) {
-      await refundUsage(planCheck.key);
-      res.status(400).json({ success: false, error: "Customer message is required." });
-      return;
-    }
-
-    if (!customerConfig || !customerConfig.agentId) {
-      await refundUsage(planCheck.key);
-      res.status(400).json({ success: false, error: "Customer agent configuration is required." });
-      return;
-    }
-
-    const chatRes = await handleCustomerAgentChat({
-      message: message.trim(),
-      customerConfig,
-      conversationHistory,
-      knowledgeItems,
-      businessContext,
-      language,
-    });
-
-    res.json({ success: true, ...chatRes });
-  } catch (err: unknown) {
-    await refundUsage(planCheck.key);
-    if (isProviderQuotaError(err)) {
-      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
-      return;
-    }
-    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
-  }
+  await customerAgentChatHandler(req, res);
 });
 
 // Real AI Customer Agent Voice Endpoint
 app.post("/api/ai/customer-agent-voice", async (req, res) => {
-  const planCheck = await enforcePlanLimit(req, res);
-  if (!planCheck.allowed) return;
+  await customerAgentVoiceHandler(req, res);
+});
 
-  try {
-    const { 
-      agentId, 
-      callerAudioTranscript, 
-      customerConfig, 
-      conversationHistory, 
-      knowledgeItems, 
-      businessContext
-    } = req.body || {};
+// Real AI Customer Agent Lead Endpoint
+app.post("/api/ai/customer-agent-lead", async (req, res) => {
+  await customerAgentLeadHandler(req, res);
+});
 
-    if (!callerAudioTranscript || !callerAudioTranscript.trim()) {
-      await refundUsage(planCheck.key);
-      res.status(400).json({ success: false, error: "Caller audio transcript is required." });
-      return;
-    }
-
-    const hasTwilioCredentials = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
-
-    const chatRes = await handleCustomerAgentChat({
-      message: callerAudioTranscript.trim(),
-      conversationHistory: conversationHistory || [],
-      customerConfig: customerConfig || { agentId, agentName: "AI Voice Employee", tone: "Professional" },
-      knowledgeItems: knowledgeItems || [],
-      businessContext: businessContext || {},
-    });
-
-    res.json({
-      success: true,
-      audioResponseText: chatRes.replyText,
-      intent: chatRes.intent,
-      leadData: chatRes.leadData,
-      appointmentData: chatRes.appointmentData,
-      humanHandoffReason: chatRes.humanHandoffReason,
-      telephonyStatus: hasTwilioCredentials ? "ACTIVE_TWILIO_TRUNK" : "PHONE_PROVIDER_NOT_CONNECTED",
-      telephonyNotice: hasTwilioCredentials 
-        ? "Connected to live telephony trunk."
-        : "Phone provider not connected. Inbound voice simulation active.",
-      provider: chatRes.provider
-    });
-  } catch (err: unknown) {
-    await refundUsage(planCheck.key);
-    if (isProviderQuotaError(err)) {
-      res.status(429).json({ success: false, error: "provider_quota_reached", message: getProviderQuotaErrorMessage() });
-      return;
-    }
-    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
-  }
+// Real AI Customer Agent Appointment Endpoint
+app.post("/api/ai/customer-agent-appointment", async (req, res) => {
+  await customerAgentAppointmentHandler(req, res);
 });
 
 // Agent Tool Execution
