@@ -12,7 +12,11 @@ import {
 } from "firebase/firestore";
 import { 
   User, 
+  GoogleAuthProvider,
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithCredential,
   signInAnonymously,
   linkWithPopup,
   signOut, 
@@ -31,11 +35,70 @@ import { getDailyLimitForPlan } from "../data/plans";
 const LOCAL_STORAGE_KEY = "bge_guest_saved_items";
 const CREDITS_CACHE_KEY = "bge_user_credits_cache";
 
+/**
+ * Detects if the current browser environment is an in-app webview (WhatsApp, Instagram, Facebook, etc.)
+ */
+export function isInAppBrowser(): boolean {
+  if (typeof window === "undefined" || !navigator?.userAgent) return false;
+  const ua = navigator.userAgent || navigator.vendor || (window as any).opera || "";
+  return /FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|musical_ly|Twitter|LinkedInApp|Snapchat/i.test(ua);
+}
+
+/**
+ * Detects if the current device is a mobile browser.
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === "undefined" || !navigator?.userAgent) return false;
+  const ua = navigator.userAgent;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || 
+    (typeof window.innerWidth === "number" && window.innerWidth <= 768 && "ontouchstart" in window);
+}
+
+/**
+ * Checks if error was caused by popup blocker or user dismissal.
+ */
+export function isPopupFailureError(err: any): boolean {
+  if (!err) return false;
+  const code = err.code || "";
+  return (
+    code === "auth/popup-blocked" ||
+    code === "auth/popup-closed-by-user" ||
+    code === "auth/cancelled-popup-request" ||
+    code === "auth/operation-not-supported-in-this-environment"
+  );
+}
+
+export const IN_APP_BROWSER_NOTICE =
+  "Please open this site in Chrome and try again.";
+
+/**
+ * Helper to sync user profile document to /users/{uid}.
+ * Never writes the "plan" field to Firestore from the client (Requirement 6).
+ */
+export async function syncUserProfile(user: User): Promise<void> {
+  if (!user) return;
+  const userRef = doc(db, "users", user.uid);
+  try {
+    await setDoc(userRef, {
+      uid: user.uid,
+      email: user.email || "",
+      displayName: user.displayName || "",
+      photoURL: user.photoURL || "",
+      isAnonymous: false,
+      lastLoginAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+  }
+}
+
 // Auth Functions
 
 /**
  * Sign in anonymously for onboarding experience.
  * Automatically gives anonymous user 1 free consultation.
+ * Never writes the "plan" field from the client.
  */
 export async function signInUserAnonymously(): Promise<User> {
   try {
@@ -51,7 +114,6 @@ export async function signInUserAnonymously(): Promise<User> {
         await setDoc(userRef, {
           uid: user.uid,
           isAnonymous: true,
-          plan: "free",
           consultationsUsed: 0,
           queriesUsedToday: 0,
           lastQueryDate: today,
@@ -60,11 +122,10 @@ export async function signInUserAnonymously(): Promise<User> {
         }, { merge: true });
       }
     } catch {
-      // Offline fallback: save initial profile
+      // Offline fallback: save initial profile without plan field
       await setDoc(userRef, {
         uid: user.uid,
         isAnonymous: true,
-        plan: "free",
         consultationsUsed: 0,
         queriesUsedToday: 0,
         lastQueryDate: today,
@@ -81,95 +142,178 @@ export async function signInUserAnonymously(): Promise<User> {
 }
 
 /**
- * Standard Sign in with Google (direct sign-in from header/dashboard)
+ * Standard Sign in with Google:
+ * 1. Called synchronously as first action with NO await before it.
+ * 2. Mobile devices and in-app browsers use signInWithRedirect directly instead of popup (Requirement 3).
+ * 3. Desktop attempts signInWithPopup; if popup fails (popup-blocked, popup-closed-by-user, cancelled-popup-request),
+ *    automatically falls back to signInWithRedirect (Requirement 2).
  */
-export async function signInWithGoogle(): Promise<User> {
-  try {
-    const cred = await signInWithPopup(auth, googleProvider);
-    const user = cred.user;
-    
-    // Sync user profile to /users/{uid}
-    if (user) {
-      const userRef = doc(db, "users", user.uid);
-      const today = new Date().toISOString().split("T")[0];
-      try {
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email || "",
-          displayName: user.displayName || "",
-          photoURL: user.photoURL || "",
-          isAnonymous: false,
-          lastLoginAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
-      }
-    }
-    return user;
-  } catch (err: unknown) {
-    console.error("Sign in error:", err);
-    throw err;
+export function signInWithGoogle(): Promise<User> {
+  if (isInAppBrowser()) {
+    return signInWithRedirect(auth, googleProvider).then(() => {
+      return new Promise<User>(() => {});
+    }).catch((err) => {
+      console.warn("In-app browser redirect warning:", err);
+      const friendlyErr = new Error("Please open this site in Chrome and try again.");
+      (friendlyErr as any).code = "auth/in-app-browser";
+      throw friendlyErr;
+    });
   }
+
+  // Mobile devices: use signInWithRedirect directly instead of popup (Requirement 3)
+  if (isMobileDevice()) {
+    return signInWithRedirect(auth, googleProvider).then(() => {
+      return new Promise<User>(() => {});
+    });
+  }
+
+  // Desktop: Call signInWithPopup as the first action directly with NO await before it (Requirement 1)
+  return signInWithPopup(auth, googleProvider)
+    .then(async (cred) => {
+      await syncUserProfile(cred.user);
+      return cred.user;
+    })
+    .catch(async (err: any) => {
+      console.warn("signInWithPopup failed, testing fallback:", err.code);
+
+      // If popup fails, automatically fall back to signInWithRedirect (Requirement 2)
+      if (isPopupFailureError(err)) {
+        await signInWithRedirect(auth, googleProvider);
+        return new Promise<User>(() => {});
+      }
+
+      throw err;
+    });
 }
 
 /**
- * Link/Upgrade Anonymous Account to Google.
- * Officially preserves existing UID, first consultation, saved reports, language and profile.
- * If account conflict occurs (Google account already exists), handles safely by signing in and migrating data.
+ * Link/Upgrade Anonymous Account to Google:
+ * 1. Synchronously calls linkWithPopup as first action directly inside click handler with NO await before it (Requirement 1).
+ * 2. Mobile devices and in-app browsers use signInWithRedirect directly instead of popup (Requirement 3).
+ * 3. If linking fails with auth/credential-already-in-use, uses GoogleAuthProvider.credentialFromError(error)
+ *    and signInWithCredential to sign in with the existing account instead of showing an error (Requirement 4).
+ * 4. If popup fails (popup-blocked, popup-closed-by-user, cancelled-popup-request), automatically falls back to signInWithRedirect (Requirement 2).
+ * 5. Never writes the "plan" field to Firestore users/{uid} from the client (Requirement 6).
  */
-export async function linkAnonymousWithGoogle(): Promise<{ user: User; linked: boolean }> {
+export function linkAnonymousWithGoogle(): Promise<{ user: User; linked: boolean }> {
   const currentUser = auth.currentUser;
   if (!currentUser) {
-    const user = await signInWithGoogle();
-    return { user, linked: false };
+    return signInWithGoogle().then((user) => ({ user, linked: false }));
   }
 
   // If already a permanent account, just return it
   if (!currentUser.isAnonymous) {
-    return { user: currentUser, linked: true };
+    return Promise.resolve({ user: currentUser, linked: true });
   }
 
   const anonUid = currentUser.uid;
 
-  try {
-    // Attempt official account upgrade / linking with popup
-    const cred = await linkWithPopup(currentUser, googleProvider);
-    const upgradedUser = cred.user;
-
-    const userRef = doc(db, "users", upgradedUser.uid);
-    await setDoc(userRef, {
-      uid: upgradedUser.uid,
-      email: upgradedUser.email || "",
-      displayName: upgradedUser.displayName || "",
-      photoURL: upgradedUser.photoURL || "",
-      isAnonymous: false,
-      plan: "free", // after signup, user becomes plan = "free"
-      lastLoginAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-
-    return { user: upgradedUser, linked: true };
-  } catch (linkError: any) {
-    console.warn("Account link error, checking for existing account conflict:", linkError.code);
-    
-    // If account already exists with different credential, sign in safely and migrate anonymous consultation data
-    if (
-      linkError.code === "auth/credential-already-in-use" || 
-      linkError.code === "auth/account-exists-with-different-credential" ||
-      linkError.code === "auth/email-already-in-use"
-    ) {
-      const permanentCred = await signInWithPopup(auth, googleProvider);
-      const permanentUser = permanentCred.user;
-
-      // Migrate reports and profile from anonymous UID to permanent UID
-      await migrateUserData(anonUid, permanentUser.uid);
-
-      return { user: permanentUser, linked: false };
-    }
-    
-    throw linkError;
+  if (isInAppBrowser()) {
+    sessionStorage.setItem("pending_migrate_anon_uid", anonUid);
+    return signInWithRedirect(auth, googleProvider).then(() => {
+      return new Promise<{ user: User; linked: boolean }>(() => {});
+    }).catch((err) => {
+      console.warn("In-app browser redirect warning:", err);
+      const friendlyErr = new Error("Please open this site in Chrome and try again.");
+      (friendlyErr as any).code = "auth/in-app-browser";
+      throw friendlyErr;
+    });
   }
+
+  // Mobile devices: use signInWithRedirect directly instead of popup (Requirement 3)
+  if (isMobileDevice()) {
+    sessionStorage.setItem("pending_migrate_anon_uid", anonUid);
+    return signInWithRedirect(auth, googleProvider).then(() => {
+      return new Promise<{ user: User; linked: boolean }>(() => {});
+    });
+  }
+
+  // Desktop: Call linkWithPopup as FIRST ACTION directly with NO await before it (Requirement 1)
+  return linkWithPopup(currentUser, googleProvider)
+    .then(async (cred) => {
+      await syncUserProfile(cred.user);
+      return { user: cred.user, linked: true };
+    })
+    .catch(async (error: any) => {
+      console.warn("linkWithPopup encountered error:", error.code);
+
+      // Requirement 4: If linking an anonymous user fails with auth/credential-already-in-use,
+      // use GoogleAuthProvider.credentialFromError(error) and signInWithCredential to sign in with the existing account instead of showing an error.
+      if (
+        error.code === "auth/credential-already-in-use" ||
+        error.code === "auth/account-exists-with-different-credential" ||
+        error.code === "auth/email-already-in-use"
+      ) {
+        const credential = GoogleAuthProvider.credentialFromError(error);
+        if (credential) {
+          try {
+            const cred = await signInWithCredential(auth, credential);
+            await syncUserProfile(cred.user);
+            await migrateUserData(anonUid, cred.user.uid);
+            return { user: cred.user, linked: false };
+          } catch (credErr) {
+            console.error("signInWithCredential fallback failed:", credErr);
+          }
+        }
+      }
+
+      // Requirement 2: If the popup fails (popup-blocked, popup-closed-by-user, or cancelled-popup-request),
+      // automatically fall back to signInWithRedirect and handle the result with getRedirectResult on app load.
+      if (isPopupFailureError(error)) {
+        sessionStorage.setItem("pending_migrate_anon_uid", anonUid);
+        await signInWithRedirect(auth, googleProvider);
+        return new Promise<{ user: User; linked: boolean }>(() => {});
+      }
+
+      throw error;
+    });
+}
+
+/**
+ * Handle redirect result on app load (Requirement 2).
+ * Recovers signed-in user and migrates anonymous data if redirect flow was used.
+ */
+export async function handleAuthRedirectResult(): Promise<User | null> {
+  try {
+    const cred = await getRedirectResult(auth);
+    if (cred && cred.user) {
+      const user = cred.user;
+      await syncUserProfile(user);
+
+      const pendingAnonUid = sessionStorage.getItem("pending_migrate_anon_uid");
+      if (pendingAnonUid && pendingAnonUid !== user.uid) {
+        await migrateUserData(pendingAnonUid, user.uid);
+        sessionStorage.removeItem("pending_migrate_anon_uid");
+      }
+      return user;
+    }
+  } catch (error: any) {
+    console.warn("getRedirectResult error:", error?.code, error?.message);
+
+    // If redirect linking failed with credential-already-in-use (Requirement 4):
+    if (
+      error.code === "auth/credential-already-in-use" ||
+      error.code === "auth/account-exists-with-different-credential" ||
+      error.code === "auth/email-already-in-use"
+    ) {
+      const credential = GoogleAuthProvider.credentialFromError(error);
+      if (credential) {
+        try {
+          const cred = await signInWithCredential(auth, credential);
+          await syncUserProfile(cred.user);
+          const pendingAnonUid = sessionStorage.getItem("pending_migrate_anon_uid");
+          if (pendingAnonUid && pendingAnonUid !== cred.user.uid) {
+            await migrateUserData(pendingAnonUid, cred.user.uid);
+            sessionStorage.removeItem("pending_migrate_anon_uid");
+          }
+          return cred.user;
+        } catch (credErr) {
+          console.error("Redirect credential sign in failed:", credErr);
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -374,19 +518,12 @@ export async function recordDailyQueryUsed(
 
 /**
  * Update User Subscription Plan (e.g. Starter, Business, Pro, Free)
+ * NOTE: Requirement 6 - Never write the "plan" field to Firestore users/{uid} from the client.
+ * Server-side Admin SDK and secure billing webhooks strictly manage subscription tiers.
  */
 export async function updateUserPlan(userId: string, plan: SubscriptionPlanId): Promise<void> {
   if (!userId) return;
-  const userRef = doc(db, "users", userId);
-  try {
-    await setDoc(userRef, {
-      plan,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-  } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
-    throw err;
-  }
+  // Intentionally does not write the "plan" field to Firestore users/{uid} from the client.
 }
 
 export async function updateUserLanguagePreference(userId: string, languageCode: string): Promise<void> {

@@ -9,7 +9,10 @@ import {
   subscribeToUserReports, 
   saveReport, 
   deleteReport, 
-  loadGuestReports 
+  loadGuestReports,
+  handleAuthRedirectResult,
+  isInAppBrowser,
+  IN_APP_BROWSER_NOTICE
 } from "./services/storageService";
 import { testFirestoreConnection } from "./firebase";
 import { BackgroundElements } from "./components/BackgroundElements";
@@ -135,9 +138,21 @@ export default function App() {
     setActiveTab("agent");
   };
 
-  // Boot connection check & Auth subscription
+  // Boot connection check, redirect resolution & Auth subscription
   useEffect(() => {
     testFirestoreConnection();
+
+    // 1. Resolve any in-flight redirect authentication on app load (Requirement 2)
+    handleAuthRedirectResult()
+      .then((redirectUser) => {
+        if (redirectUser) {
+          setUser(redirectUser);
+          showToast(`Welcome back, ${redirectUser.displayName || redirectUser.email}!`, "success");
+        }
+      })
+      .catch((err) => {
+        console.warn("Redirect processing error:", err);
+      });
 
     const unsubAuth = subscribeToAuth(async (currentUser) => {
       if (currentUser) {
@@ -188,15 +203,25 @@ export default function App() {
     }
   }, [user, isAuthLoading]);
 
-  const handleSignIn = async () => {
-    try {
-      showToast("Connecting to Google...", "info");
-      const loggedUser = await signInWithGoogle();
-      showToast(`Welcome back, ${loggedUser.displayName || loggedUser.email}!`, "success");
-    } catch (err: unknown) {
-      console.error("Login failed:", err);
-      showToast("Sign in was cancelled or failed.", "warning");
-    }
+  const handleSignIn = () => {
+    // 1. Call signInWithGoogle directly with NO await before it (Requirement 1)
+    signInWithGoogle()
+      .then((loggedUser) => {
+        showToast(`Welcome back, ${loggedUser.displayName || loggedUser.email}!`, "success");
+      })
+      .catch((err: any) => {
+        console.error("Login failed:", err);
+        if (err?.code === "auth/in-app-browser") {
+          showToast("Please open this site in Chrome and try again.", "warning");
+        } else if (err?.code !== "auth/popup-closed-by-user") {
+          showToast(
+            isInAppBrowser()
+              ? "Please open this site in Chrome and try again."
+              : "Sign in was cancelled or failed.",
+            "warning"
+          );
+        }
+      });
   };
 
   const handleSignOut = async () => {

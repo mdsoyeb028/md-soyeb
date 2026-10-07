@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Sparkles, Shield, Zap, X, Check, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Sparkles, Shield, Zap, X, Check, Lock, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { useCredits } from "../context/CreditsContext";
+import { isInAppBrowser } from "../services/storageService";
 
 interface SignupGateModalProps {
   isOpen: boolean;
@@ -13,13 +14,12 @@ export const SignupGateModal: React.FC<SignupGateModalProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
-  const onGoogleClick = async () => {
-    try {
-      setIsSubmitting(true);
-      await handleGoogleSignup();
-    } finally {
+  const onGoogleClick = () => {
+    // 1. Call handleGoogleSignup directly with NO await before it (Requirement 1)
+    setIsSubmitting(true);
+    handleGoogleSignup().finally(() => {
       setIsSubmitting(false);
-    }
+    });
   };
 
   return (
@@ -83,6 +83,19 @@ export const SignupGateModal: React.FC<SignupGateModalProps> = ({ isOpen, onClos
             </li>
           </ul>
         </div>
+
+        {/* In-app Browser Notice */}
+        {isInAppBrowser() && (
+          <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-amber-300 block">In-App Browser Detected</span>
+              <p className="text-amber-200/90 leading-relaxed text-[11px]">
+                Please open this site in Chrome and try again. Google sign-in is blocked inside in-app browsers (WhatsApp, Instagram, Facebook). Tap the top-right menu (⋮ or ···) and choose <strong>Open in Chrome</strong>.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="space-y-2.5 pt-1">

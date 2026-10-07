@@ -8,7 +8,8 @@ import {
   subscribeToUserProfile, 
   recordConsultationUsed, 
   recordDailyQueryUsed, 
-  updateUserPlan 
+  updateUserPlan,
+  isInAppBrowser 
 } from "../services/storageService";
 import { CENTRAL_PLANS, getDailyLimitForPlan } from "../data/plans";
 
@@ -228,29 +229,40 @@ export const CreditsProvider: React.FC<CreditsProviderProps> = ({
   }, [user, onShowToast]);
 
   // Google Signup / Account Upgrade
-  const handleGoogleSignup = useCallback(async () => {
-    try {
-      const { user: upgradedUser, linked } = await linkAnonymousWithGoogle();
-      if (onUserChanged) onUserChanged(upgradedUser);
-      setIsSignupModalOpen(false);
+  const handleGoogleSignup = useCallback((): Promise<void> => {
+    // 1. Call linkAnonymousWithGoogle as first action with NO await before it
+    return linkAnonymousWithGoogle()
+      .then(({ user: upgradedUser, linked }) => {
+        if (onUserChanged) onUserChanged(upgradedUser);
+        setIsSignupModalOpen(false);
 
-      if (linked) {
-        if (onShowToast) {
-          onShowToast(`Account created! Welcome, ${upgradedUser.displayName || upgradedUser.email}! You now have 10 AI queries/day on Free Plan.`, "success");
+        if (linked) {
+          if (onShowToast) {
+            onShowToast(`Account created! Welcome, ${upgradedUser.displayName || upgradedUser.email}! You now have 10 AI queries/day on Free Plan.`, "success");
+          }
+        } else {
+          if (onShowToast) {
+            onShowToast(`Welcome back, ${upgradedUser.displayName || upgradedUser.email}! Your data has been synced to your account.`, "success");
+          }
         }
-      } else {
-        if (onShowToast) {
-          onShowToast(`Welcome back, ${upgradedUser.displayName || upgradedUser.email}! Your data has been synced to your account.`, "success");
+      })
+      .catch((err: any) => {
+        console.error("Signup failed:", err);
+        if (err?.code === "auth/in-app-browser") {
+          if (onShowToast) {
+            onShowToast("Please open this site in Chrome and try again.", "warning");
+          }
+        } else if (err?.code !== "auth/popup-closed-by-user") {
+          if (onShowToast) {
+            onShowToast(
+              isInAppBrowser()
+                ? "Please open this site in Chrome and try again."
+                : "Sign up was cancelled or encountered an issue.",
+              "warning"
+            );
+          }
         }
-      }
-    } catch (err: any) {
-      console.error("Signup failed:", err);
-      if (err.code !== "auth/popup-closed-by-user") {
-        if (onShowToast) {
-          onShowToast("Sign up was cancelled or encountered an issue.", "warning");
-        }
-      }
-    }
+      });
   }, [onUserChanged, onShowToast]);
 
   const openSignupModal = () => setIsSignupModalOpen(true);
