@@ -41,7 +41,8 @@ import {
   ShieldCheck,
   Eye,
   Sliders,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 import {
   ActiveTab,
@@ -160,6 +161,78 @@ export const CustomerAgentCenter: React.FC<CustomerAgentCenterProps> = ({
   const handleSelectSection = (sec: CustomerAgentSection) => {
     setActiveSection(sec);
     onSectionChanged?.(sec);
+  };
+
+  // Email Integration (Resend) state
+  const [emailStatus, setEmailStatus] = useState<"Connected" | "Not configured" | "loading">("loading");
+  const [emailSender, setEmailSender] = useState<string | null>(null);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{
+    success: boolean;
+    isConfigured?: boolean;
+    messageId?: string;
+    error?: string;
+    mailtoUrl?: string;
+    note?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (activeSection === "integrations") {
+      fetch("/api/email/test")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.isConfigured) {
+            setEmailStatus("Connected");
+            setEmailSender(data.fromEmail || null);
+          } else {
+            setEmailStatus("Not configured");
+            setEmailSender(null);
+          }
+        })
+        .catch(() => {
+          setEmailStatus("Not configured");
+        });
+    }
+  }, [activeSection]);
+
+  const handleSendTestEmail = async () => {
+    if (!user || user.isAnonymous) {
+      showToast("Please sign in with Google to send a test email to yourself.", "warning");
+      return;
+    }
+    setIsSendingTestEmail(true);
+    setTestEmailResult(null);
+    try {
+      const data = await safeFetchJson<{
+        success: boolean;
+        isConfigured: boolean;
+        messageId?: string;
+        error?: string;
+        mailtoUrl?: string;
+        note?: string;
+      }>("/api/email/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetEmail: user.email }),
+      });
+
+      setTestEmailResult(data);
+      if (data.success) {
+        setEmailStatus("Connected");
+        showToast("Test email sent successfully via Resend!", "success");
+      } else {
+        showToast("Test email could not be sent automatically.", "warning");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to dispatch test email.";
+      setTestEmailResult({
+        success: false,
+        error: msg,
+      });
+      showToast(msg, "warning");
+    } finally {
+      setIsSendingTestEmail(false);
+    }
   };
 
   useEffect(() => {
@@ -1275,8 +1348,11 @@ export const CustomerAgentCenter: React.FC<CustomerAgentCenterProps> = ({
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">Telephony Provider Status:</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 border border-amber-400">
+                    Demo Mode (no real calls)
+                  </span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
                     Phone Provider Not Connected
                   </span>
@@ -2573,6 +2649,97 @@ export const CustomerAgentCenter: React.FC<CustomerAgentCenterProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 1. Transactional Email Dispatch (Resend) */}
+            <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-4 flex flex-col justify-between gap-3 shadow-sm md:col-span-2">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold text-white">Email Integration (Resend)</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                      emailStatus === "Connected"
+                        ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30"
+                        : "bg-amber-950 text-amber-300 border border-amber-500/30"
+                    }`}
+                  >
+                    {emailStatus === "loading" ? "Checking..." : emailStatus}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Transactional email dispatch via Resend API. Powers honest action approvals, client updates, and customer notifications.
+                </p>
+                <div className="text-[11px] text-slate-400 font-mono mt-1">
+                  {emailSender ? (
+                    <span>Sender: <strong className="text-slate-200">{emailSender}</strong></span>
+                  ) : (
+                    <span>Server status: <span className="text-amber-400">RESEND_API_KEY &amp; RESEND_FROM_EMAIL not configured</span></span>
+                  )}
+                </div>
+              </div>
+
+              {/* Test Email Result Banner */}
+              {testEmailResult && (
+                <div
+                  className={`p-3 rounded-lg border text-xs space-y-1.5 ${
+                    testEmailResult.success
+                      ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-200"
+                      : "bg-amber-950/70 border-amber-500/40 text-amber-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold">
+                    {testEmailResult.success ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>✓ Test email sent successfully to {user?.email || "your email"}!</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="uppercase tracking-wider text-[11px] font-black text-amber-300">NOT sent automatically</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    {testEmailResult.success
+                      ? `Provider Message ID: ${testEmailResult.messageId}`
+                      : (testEmailResult.error || "RESEND_API_KEY or RESEND_FROM_EMAIL is missing in environment.")}
+                  </p>
+                  {!testEmailResult.success && testEmailResult.mailtoUrl && (
+                    <div className="pt-1">
+                      <a
+                        href={testEmailResult.mailtoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Open in Email Client (mailto:)</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-[10px] text-slate-500 font-mono">Channel: Transactional Email</span>
+                <button
+                  type="button"
+                  onClick={handleSendTestEmail}
+                  disabled={isSendingTestEmail}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
+                >
+                  {isSendingTestEmail ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>Send test email to myself</span>
+                </button>
+              </div>
+            </div>
+
             {integrations.map((int) => (
               <div
                 key={int.id}

@@ -50,11 +50,13 @@ import {
   MessageSquare,
   Home,
   Edit3,
-  BarChart3
+  BarChart3,
+  Mail
 } from "lucide-react";
 import { 
   BusinessAgentConfig, 
   AgentActionTask, 
+  AgentActionLifecycleStatus,
   BusinessDocument, 
   BusinessTask, 
   SavedItem, 
@@ -223,6 +225,74 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
   const [tasks, setTasks] = useState<AgentActionTask[]>([]);
   const [taskFilter, setTaskFilter] = useState<string>("ALL");
   const [isExecutingAction, setIsExecutingAction] = useState<string | null>(null);
+
+  // Email Integration state
+  const [emailStatus, setEmailStatus] = useState<"Connected" | "Not configured" | "loading">("loading");
+  const [emailSender, setEmailSender] = useState<string | null>(null);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{
+    success: boolean;
+    isConfigured?: boolean;
+    messageId?: string;
+    error?: string;
+    mailtoUrl?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/email/test")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.isConfigured) {
+          setEmailStatus("Connected");
+          setEmailSender(data.fromEmail || null);
+        } else {
+          setEmailStatus("Not configured");
+          setEmailSender(null);
+        }
+      })
+      .catch(() => {
+        setEmailStatus("Not configured");
+      });
+  }, []);
+
+  const handleSendTestEmail = async () => {
+    if (!user || user.isAnonymous) {
+      showToast("Please sign in with Google to send a test email to yourself.", "warning");
+      return;
+    }
+    setIsSendingTestEmail(true);
+    setTestEmailResult(null);
+    try {
+      const data = await safeFetchJson<{
+        success: boolean;
+        isConfigured: boolean;
+        messageId?: string;
+        error?: string;
+        mailtoUrl?: string;
+      }>("/api/email/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetEmail: user.email }),
+      });
+
+      setTestEmailResult(data);
+      if (data.success) {
+        setEmailStatus("Connected");
+        showToast("Test email sent successfully via Resend!", "success");
+      } else {
+        showToast("Test email could not be sent automatically.", "warning");
+      }
+    } catch (err: unknown) {
+      const msg = normalizeErrorMessage(err, "Failed to send test email.");
+      setTestEmailResult({
+        success: false,
+        error: msg,
+      });
+      showToast(msg, "warning");
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
 
   // Documents State
   const [documents, setDocuments] = useState<BusinessDocument[]>([]);
@@ -1006,42 +1076,73 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
     }
   };
 
-  // 4. Action Approval Lifecycle: PREPARED BY AI -> WAITING FOR APPROVAL -> EXECUTED -> COMPLETED
+  // 4. Action Approval Lifecycle: PREPARED BY AI -> WAITING FOR APPROVAL -> (user clicks Approve) -> EXECUTED (only on real success) or FAILED (with reason & retry)
   const handleApproveAction = async (task: AgentActionTask) => {
+    if (!user || user.isAnonymous) {
+      showToast("Please sign in with Google to approve and execute real agent actions.", "warning");
+      return;
+    }
+
     setIsExecutingAction(task.id);
     try {
       const data = await safeFetchJson<{
         success: boolean;
-        executionNote?: string;
-        externalExecutionLink?: string;
+        taskId?: string;
+        status?: AgentActionLifecycleStatus;
+        messageId?: string;
         error?: string;
+        executionNote?: string;
+        mailtoUrl?: string;
       }>("/api/ai/agent-action-execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskId: task.id,
-          actionType: task.actionType,
-          targetPlatform: task.targetPlatform,
-          content: task.previewContent,
-          userId: user?.uid,
+          agentId: task.agentId || activeAgent?.id,
+          targetPlatform: task.targetPlatform || "email",
+          content: task.previewContent || task.details,
+          recipientEmail: task.recipientEmail || "",
+          subject: task.title,
         }),
       });
 
-      if (!data.success) {
-        throw new Error(data.error || "Execution failed.");
+      if (data.success && data.status === "EXECUTED") {
+        const updatedTask: AgentActionTask = {
+          ...task,
+          status: "EXECUTED",
+          messageId: data.messageId,
+          executionNotes: data.executionNote || `Executed via Resend. Message ID: ${data.messageId}`,
+          updatedAt: new Date().toISOString(),
+        };
+        await saveAgentTask(updatedTask, user);
+        setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+        showToast(data.executionNote || "Action executed successfully via Resend!", "success");
+      } else {
+        const failureReason = data.error || "Email delivery failed via provider.";
+        const updatedTask: AgentActionTask = {
+          ...task,
+          status: "FAILED",
+          failureReason,
+          mailtoFallback: data.mailtoUrl || null,
+          executionNotes: failureReason,
+          updatedAt: new Date().toISOString(),
+        };
+        await saveAgentTask(updatedTask, user);
+        setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+        showToast(`Action execution failed: ${failureReason}`, "warning");
       }
-
+    } catch (err: unknown) {
+      const failureReason = normalizeErrorMessage(err, "Execution failed.");
       const updatedTask: AgentActionTask = {
         ...task,
-        status: "COMPLETED",
-        executionNotes: data.executionNote || "Approved and executed.",
+        status: "FAILED",
+        failureReason,
+        executionNotes: failureReason,
         updatedAt: new Date().toISOString(),
       };
-
-      await saveAgentTask(updatedTask, user);
-      showToast(data.executionNote || "Task approved and completed.", "success");
-    } catch (err) {
-      showToast("Action approval could not be executed.", "warning");
+      await saveAgentTask(updatedTask, user).catch(() => {});
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+      showToast(`Action execution failed: ${failureReason}`, "warning");
     } finally {
       setIsExecutingAction(null);
     }
@@ -2308,57 +2409,99 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
                   </div>
 
                   {/* PREPARED ACTION APPROVAL CARD (ITEM 14) */}
-                  {msg.preparedTask && (
-                    <div className="w-full max-w-lg p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/90 to-slate-900 border-2 border-indigo-500/50 shadow-xl space-y-2.5">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-indigo-800/50">
-                        <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black uppercase tracking-wider border border-amber-500/40">
-                          PREPARED BY AI • WAITING FOR APPROVAL
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          Target: {msg.preparedTask.targetPlatform || "Direct"}
-                        </span>
-                      </div>
+                  {msg.preparedTask && (() => {
+                    const syncedTask = tasks.find((t) => t.id === msg.preparedTask?.id) || msg.preparedTask;
+                    return (
+                      <div className="w-full max-w-lg p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/90 to-slate-900 border-2 border-indigo-500/50 shadow-xl space-y-2.5">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-indigo-800/50">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
+                            syncedTask.status === "EXECUTED"
+                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                              : syncedTask.status === "FAILED"
+                              ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                              : "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                          }`}>
+                            {syncedTask.status === "EXECUTED" ? "✓ EXECUTED VIA RESEND" : syncedTask.status}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Target: {syncedTask.targetPlatform || "Direct"}
+                          </span>
+                        </div>
 
-                      <h4 className="text-xs font-bold text-white">
-                        {msg.preparedTask.title}
-                      </h4>
+                        <h4 className="text-xs font-bold text-white">
+                          {syncedTask.title}
+                        </h4>
 
-                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
-                        {msg.preparedTask.previewContent}
-                      </div>
+                        <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
+                          {syncedTask.previewContent}
+                        </div>
 
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-[10px] text-slate-400">
-                          Budget: {msg.preparedTask.estimatedCostOrBudget || "$0"}
-                        </span>
+                        {syncedTask.status === "FAILED" && (
+                          <div className="p-2 rounded-lg bg-rose-950/70 border border-rose-500/40 text-rose-200 text-xs">
+                            <span className="font-bold">Execution Failed:</span> {syncedTask.failureReason || "Provider delivery failed."}
+                          </div>
+                        )}
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(msg.preparedTask?.previewContent || "", `act_${msg.id}`)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Copy className="w-3 h-3" />
-                            <span>{copiedKey === `act_${msg.id}` ? "Copied" : "Copy"}</span>
-                          </button>
+                        {syncedTask.status === "EXECUTED" && syncedTask.messageId && (
+                          <div className="text-[10px] text-emerald-400 font-mono">
+                            Provider Message ID: {syncedTask.messageId}
+                          </div>
+                        )}
 
-                          <button
-                            type="button"
-                            onClick={() => handleApproveAction(msg.preparedTask!)}
-                            disabled={isExecutingAction === msg.preparedTask.id}
-                            className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
-                          >
-                            {isExecutingAction === msg.preparedTask.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] text-slate-400">
+                            Budget: {syncedTask.estimatedCostOrBudget || "$0"}
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(syncedTask.previewContent || "", `act_${msg.id}`)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{copiedKey === `act_${msg.id}` ? "Copied" : "Copy"}</span>
+                            </button>
+
+                            {syncedTask.status === "EXECUTED" ? (
+                              <span className="px-3 py-1 rounded-lg bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Sent</span>
+                              </span>
+                            ) : syncedTask.status === "FAILED" ? (
+                              <button
+                                type="button"
+                                onClick={() => handleApproveAction(syncedTask)}
+                                disabled={isExecutingAction === syncedTask.id}
+                                className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                              >
+                                {isExecutingAction === syncedTask.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-3 h-3" />
+                                )}
+                                <span>Retry Send</span>
+                              </button>
                             ) : (
-                              <CheckCircle2 className="w-3 h-3" />
+                              <button
+                                type="button"
+                                onClick={() => handleApproveAction(syncedTask)}
+                                disabled={isExecutingAction === syncedTask.id}
+                                className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-black flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
+                              >
+                                {isExecutingAction === syncedTask.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="w-3 h-3" />
+                                )}
+                                <span>Approve &amp; Execute</span>
+                              </button>
                             )}
-                            <span>Approve & Execute</span>
-                          </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <span className="text-[10px] text-slate-500 px-1 font-mono">
                     {msg.timestamp}
@@ -2405,10 +2548,14 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
       {/* SECTION 2: TALK (VOICE) */}
       {activeSection === "voice" && (
         <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-indigo-500/40 shadow-2xl text-center space-y-6">
-          <div className="space-y-1">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-xs font-bold">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              <span>Demo Mode (no real calls)</span>
+            </div>
             <h3 className="text-lg font-black text-white">🎙 Talk to AI Business Agent</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Real-time voice conversation with microphone audio input and spoken audio feedback.
+              In-browser simulated voice conversation with microphone audio input and spoken audio feedback.
             </p>
           </div>
 
@@ -2802,13 +2949,15 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
                       <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                         task.status === "WAITING FOR APPROVAL"
                           ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                          : task.status === "COMPLETED"
+                          : task.status === "PREPARED BY AI"
+                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                          : task.status === "EXECUTED" || task.status === "COMPLETED"
                           ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                           : task.status === "FAILED"
                           ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
                           : "bg-slate-800 text-slate-300"
                       }`}>
-                        {task.status}
+                        {task.status === "EXECUTED" ? "✓ EXECUTED VIA RESEND" : task.status}
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-slate-500 font-mono">
@@ -2830,8 +2979,36 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
                       {task.previewContent || task.details}
                     </p>
 
+                    {task.status === "FAILED" && (
+                      <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-200 text-xs space-y-1.5">
+                        <div className="flex items-center gap-1.5 font-bold text-rose-300">
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                          <span>Delivery Failed: {task.failureReason || task.executionNotes || "Provider error."}</span>
+                        </div>
+                        {task.mailtoFallback && (
+                          <div className="pt-1">
+                            <a
+                              href={task.mailtoFallback}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              <span>Open in Email Client (mailto:)</span>
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {task.status === "EXECUTED" && task.messageId && (
+                      <div className="text-[10px] text-emerald-400 font-mono">
+                        Provider Message ID: {task.messageId}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-2 border-t border-slate-900 text-xs">
-                      <span className="text-[10px] text-slate-500">
+                      <span className="text-[10px] text-slate-500 truncate max-w-[240px]">
                         {task.executionNotes || "Created by AI Business Agent"}
                       </span>
                       <div className="flex items-center gap-2">
@@ -2844,15 +3021,35 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
                           <span>{copiedKey === `task_${task.id}` ? "Copied" : "Copy"}</span>
                         </button>
 
-                        {task.status === "WAITING FOR APPROVAL" && (
+                        {task.status === "FAILED" && (
+                          <button
+                            type="button"
+                            onClick={() => handleApproveAction(task)}
+                            disabled={isExecutingAction === task.id}
+                            className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {isExecutingAction === task.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            )}
+                            <span>Retry Send</span>
+                          </button>
+                        )}
+
+                        {(task.status === "WAITING FOR APPROVAL" || task.status === "PREPARED BY AI") && (
                           <button
                             type="button"
                             onClick={() => handleApproveAction(task)}
                             disabled={isExecutingAction === task.id}
                             className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Approve & Execute</span>
+                            {isExecutingAction === task.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            )}
+                            <span>Approve &amp; Execute</span>
                           </button>
                         )}
                       </div>
@@ -3435,6 +3632,83 @@ export const BusinessAgentCenter: React.FC<BusinessAgentCenterProps> = ({
           {/* TAB 4: DATA SOURCES (Requirement 5) */}
           {settingsTab === "sources" && (
             <div className="space-y-4 text-xs">
+              {/* Email Integration (Resend) Card */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-cyan-400" />
+                    <div>
+                      <strong className="text-white block text-sm">Email Integration (Resend)</strong>
+                      <span className="text-[11px] text-slate-400">
+                        {emailSender ? `Sender: ${emailSender}` : "Transactional email dispatch for approved tasks & reports"}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    emailStatus === "Connected"
+                      ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30"
+                      : "bg-amber-950 text-amber-300 border border-amber-500/30"
+                  }`}>
+                    {emailStatus === "loading" ? "Checking..." : emailStatus}
+                  </span>
+                </div>
+
+                {testEmailResult && (
+                  <div className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                    testEmailResult.success
+                      ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-200"
+                      : "bg-amber-950/70 border-amber-500/40 text-amber-200"
+                  }`}>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      {testEmailResult.success ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span>✓ Test email sent successfully!</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-4 h-4 text-amber-400" />
+                          <span className="uppercase text-[11px] font-black">NOT sent automatically</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      {testEmailResult.success
+                        ? `Message ID: ${testEmailResult.messageId}`
+                        : (testEmailResult.error || "RESEND_API_KEY or RESEND_FROM_EMAIL not configured in server environment.")}
+                    </p>
+                    {!testEmailResult.success && testEmailResult.mailtoUrl && (
+                      <div className="pt-1">
+                        <a
+                          href={testEmailResult.mailtoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open in Email Client (mailto:)</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-900 text-xs">
+                  <span className="text-[10px] text-slate-500">
+                    {emailStatus === "Connected" ? "Ready for live agent task execution" : "Requires RESEND_API_KEY & RESEND_FROM_EMAIL in .env"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSendTestEmail}
+                    disabled={isSendingTestEmail}
+                    className="px-3.5 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSendingTestEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    <span>Send test email to myself</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-3">

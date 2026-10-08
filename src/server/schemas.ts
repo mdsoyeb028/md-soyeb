@@ -60,7 +60,7 @@ export const AssistantRequestSchema = z.object({
   languageName: z.string().max(50).optional(),
   websiteUrl: z.string().max(2048).optional(),
   doItForMe: z.boolean().optional(),
-  businessProfile: z.record(z.any()).optional(),
+  businessProfile: z.record(z.string(), z.any()).optional(),
 });
 
 export const SeoRequestSchema = z.object({
@@ -79,7 +79,7 @@ export const ExportRequestSchema = z.object({
 
 export const BusinessRequestSchema = z.object({
   toolType: z.string().min(1, "Tool type is required").max(50),
-  inputs: z.record(z.any()),
+  inputs: z.record(z.string(), z.any()),
   language: z.string().max(50).optional(),
   languageName: z.string().max(50).optional(),
 });
@@ -108,4 +108,18 @@ export const VerifyPaymentSchema = z.object({
   razorpay_order_id: z.string().min(1, "razorpay_order_id is required").max(100),
   razorpay_payment_id: z.string().min(1, "razorpay_payment_id is required").max(100),
   razorpay_signature: z.string().min(1, "razorpay_signature is required").max(256),
+});
+
+// --- 8. Agent Action Execution (Email & External Dispatches) ---
+export const ActionExecutionSchema = z.object({
+  taskId: z.string().min(1, "Task ID is required").max(128),
+  agentId: z.string().max(128).optional(),
+  targetPlatform: z.string().max(50).optional().default("email"),
+  content: z.string().max(20000).optional(),
+  recipientEmail: z.string().email("Invalid recipient email").max(100).optional().or(z.literal("")),
+  subject: z.string().max(200).optional(),
+});
+
+export const SendTestEmailSchema = z.object({
+  targetEmail: z.string().email("Invalid target email address").max(100).optional(),
 });

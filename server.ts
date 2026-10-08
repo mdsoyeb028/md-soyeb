@@ -45,6 +45,8 @@ import customerAgentVoiceHandler from "./src/server/api/customer-agent-voice.ts"
 import paymentsCreateOrderHandler from "./src/server/api/payments-create-order.ts";
 import paymentsVerifyHandler from "./src/server/api/payments-verify.ts";
 import paymentsWebhookHandler from "./src/server/api/payments-webhook.ts";
+import agentActionExecuteHandler from "./src/server/api/agent-action-execute.ts";
+import emailTestHandler from "./src/server/api/email-test.ts";
 
 dotenv.config();
 
@@ -652,46 +654,14 @@ app.post("/api/ai/agent-document-parse", async (req, res) => {
   }
 });
 
-// Action Approval Execution (Transitions: PREPARED BY AI -> WAITING FOR APPROVAL -> EXECUTED -> COMPLETED)
+// Action Approval Execution (Transitions: PREPARED BY AI -> WAITING FOR APPROVAL -> EXECUTED only on real send, else FAILED)
 app.post("/api/ai/agent-action-execute", async (req, res) => {
-  try {
-    const { taskId, actionType, targetPlatform, content, userId } = req.body || {};
+  await agentActionExecuteHandler(req, res);
+});
 
-    if (!taskId) {
-      res.status(400).json({ success: false, error: "Task ID is required." });
-      return;
-    }
-
-    const executedAt = new Date().toISOString();
-    let externalExecutionLink: string | null = null;
-    let dispatchStatus: "COMPLETED" | "FAILED" = "COMPLETED";
-    let executionNote = "Approved by user and recorded.";
-
-    const platformLower = (targetPlatform || "").toLowerCase();
-    const contentEncoded = encodeURIComponent(content || "");
-
-    if (platformLower.includes("whatsapp")) {
-      externalExecutionLink = `https://api.whatsapp.com/send?text=${contentEncoded}`;
-      executionNote = "WhatsApp intent link prepared. Tap to send in WhatsApp.";
-    } else if (platformLower.includes("email")) {
-      externalExecutionLink = `mailto:?subject=${encodeURIComponent("Business Proposal")}&body=${contentEncoded}`;
-      executionNote = "Mailto draft prepared for email client.";
-    } else {
-      executionNote = "Prepared by AI — external execution is not connected. Deliverable copied to clipboard and saved in task history.";
-    }
-
-    res.json({
-      success: true,
-      taskId,
-      status: dispatchStatus,
-      lifecycle: "COMPLETED",
-      executedAt,
-      externalExecutionLink,
-      executionNote,
-    });
-  } catch (err: unknown) {
-    res.status(500).json({ success: false, error: normalizeServerErrorMessage(err) });
-  }
+// Test Email endpoint for Integrations view (GET for status, POST to test dispatch)
+app.all(["/api/email/test", "/api/ai/email-test"], async (req, res) => {
+  await emailTestHandler(req, res);
 });
 
 // Dedicated Real URL Auto-Detection & Multi-Channel Analysis for Agent

@@ -968,7 +968,11 @@ export interface AgentActionTask {
   previewContent: string;
   estimatedCostOrBudget?: string;
   targetPlatform?: string;
+  recipientEmail?: string;
   executionNotes?: string;
+  failureReason?: string;
+  mailtoFallback?: string | null;
+  messageId?: string;
   createdAt: string;
   updatedAt: string;
 }

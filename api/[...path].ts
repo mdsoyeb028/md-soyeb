@@ -23,6 +23,7 @@ import customerAgentAppointmentHandler from "../src/server/api/customer-agent-ap
 import paymentsCreateOrderHandler from "../src/server/api/payments-create-order.ts";
 import paymentsVerifyHandler from "../src/server/api/payments-verify.ts";
 import paymentsWebhookHandler from "../src/server/api/payments-webhook.ts";
+import emailTestHandler from "../src/server/api/email-test.ts";
 
 function extractCleanPath(req: any): string {
   // Check req.query.path if Vercel populated catch-all query parameter
@@ -142,6 +143,11 @@ export default async function handler(req: any, res: any) {
 
       case "/payments/webhook":
         return await paymentsWebhookHandler(req, res);
+
+      // Email Test Endpoints
+      case "/email/test":
+      case "/ai/email-test":
+        return await emailTestHandler(req, res);
 
       case "/":
         return await indexHandler(req, res);

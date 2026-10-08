@@ -1,3 +1,4 @@
+import { parse } from "node-html-parser";
 import { performRealSeoAudit } from "./seoCrawler.ts";
 import { generateAICompletion } from "./aiProvider.ts";
 import { validatePublicUrl } from "./ssrfGuard.ts";
@@ -216,7 +217,7 @@ async function fetchGenericPageMetadata(url: string) {
       const title = root.querySelector("title")?.text?.trim() || root.querySelector("meta[property='og:title']")?.getAttribute("content") || "";
       const metaDescription = root.querySelector("meta[name='description']")?.getAttribute("content") || root.querySelector("meta[property='og:description']")?.getAttribute("content") || "";
       const ogImage = root.querySelector("meta[property='og:image']")?.getAttribute("content") || "";
-      const h1 = root.querySelectorAll("h1").map(el => el.text.trim()).filter(Boolean);
+      const h1 = root.querySelectorAll("h1").map((el: any) => el.text.trim()).filter(Boolean);
       return {
         title,
         metaDescription,

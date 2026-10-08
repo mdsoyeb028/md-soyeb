@@ -43,7 +43,9 @@ export async function loadVerifiedCustomerAgent(agentId: string): Promise<Loaded
 
   // 2. Fetch full owner's customer agent configuration to get verified settings
   let config: CustomerAgentConfig = {
+    id: cleanAgentId,
     agentId: cleanAgentId,
+    userId: ownerUid,
     agentName: publicData.agentName || "Customer Support AI",
     businessName: publicData.businessName || "Business Services",
     enabled: true,
@@ -56,10 +58,16 @@ export async function loadVerifiedCustomerAgent(agentId: string): Promise<Loaded
     greetingText: publicData.greetingText || "",
     workingHoursText: publicData.workingHoursText || "",
     locationText: publicData.locationText || "",
+    voiceGender: publicData.voiceGender || "female",
     bookingEnabled: publicData.bookingEnabled ?? true,
     leadCaptureEnabled: publicData.leadCaptureEnabled ?? true,
+    humanHandoffEnabled: publicData.humanHandoffEnabled ?? false,
+    publicWidgetEnabled: publicData.publicWidgetEnabled ?? true,
+    isTelephonyConnected: publicData.isTelephonyConnected ?? false,
+    isCalendarConnected: publicData.isCalendarConnected ?? false,
     suggestedQuestions: publicData.suggestedQuestions || [],
     widgetPosition: publicData.widgetPosition || "bottom-right",
+    createdAt: publicData.createdAt || new Date().toISOString(),
     updatedAt: publicData.updatedAt || new Date().toISOString(),
   };
 
@@ -107,10 +115,12 @@ export async function loadVerifiedCustomerAgent(agentId: string): Promise<Loaded
         knowledgeItems.push({
           id: doc.id,
           agentId: cleanAgentId,
+          userId: ownerUid,
           type: data.type || "faq",
           title: data.title,
           content: data.content,
           state: "READY",
+          createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
         });
       }

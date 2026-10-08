@@ -259,3 +259,42 @@ export function isProviderQuotaError(error: unknown): boolean {
 export function getProviderQuotaErrorMessage(): string {
   return "Underlying AI provider capacity limit reached. Please wait a moment or upgrade for priority processing.";
 }
+
+/**
+ * Daily email dispatch limits per plan:
+ * Free: 5/day, Starter: 50/day, Business: 250/day, Pro: 1000/day
+ */
+const EMAIL_DAILY_LIMITS: Record<SubscriptionPlanId, number> = {
+  free: 5,
+  starter: 50,
+  business: 250,
+  pro: 1000,
+};
+
+export async function enforceEmailSendLimit(uid: string, plan: SubscriptionPlanId): Promise<{
+  allowed: boolean;
+  limit: number;
+  count: number;
+  message?: string;
+}> {
+  const limit = EMAIL_DAILY_LIMITS[plan] || 5;
+  const today = getTodayString();
+  const key = `usage:email:${uid}:${today}`;
+
+  const count = await atomicIncr(key);
+  if (count > limit) {
+    await atomicDecr(key);
+    return {
+      allowed: false,
+      limit,
+      count: count - 1,
+      message: `Daily email sending limit reached (${limit} emails/day for ${plan.toUpperCase()} plan). Resets at midnight UTC.`,
+    };
+  }
+
+  return {
+    allowed: true,
+    limit,
+    count,
+  };
+}

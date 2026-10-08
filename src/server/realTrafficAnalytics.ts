@@ -463,7 +463,7 @@ export async function inspectStoreListing(targetUrl: string): Promise<RealStoreL
         result.observedFindings.push(`Observed App Title: "${result.title}"`);
       }
     } else {
-      result.observedFindings.push(`Listing returned HTTP ${res.status}. Verify the URL is a public app listing.`);
+      result.observedFindings.push(`Listing returned HTTP ${safeRes.status}. Verify the URL is a public app listing.`);
     }
   } catch (err: unknown) {
     result.observedFindings.push(`Listing lookup failed: ${err instanceof Error ? err.message : String(err)}`);
