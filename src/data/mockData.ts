@@ -53,6 +53,8 @@ export const QUICK_PROMPTS = [
 ];
 
 export const BUSINESS_TOOLS_LIST = [
+  { id: "growth-roadmap", name: "Growth Roadmap Generator", desc: "Step-by-step checklist based on business type & stage (Startup, Scaling, Exporting)" },
+  { id: "market-alerts", name: "Market & Export Email Alerts", desc: "Subscribe to email intelligence for market trends, buyer RFPs & tariff shifts" },
   { id: "idea-gen", name: "Business Idea Generator", desc: "Validate market demand & niche angles" },
   { id: "biz-plan", name: "Business Plan Generator", desc: "Executive summary, USP & monetization" },
   { id: "mkt-plan", name: "Marketing Plan", desc: "Organic, paid & B2B referral roadmaps" },

@@ -146,6 +146,37 @@ export interface ExportAnalysisResult {
   buyerOutreachDraft?: string;
   quotationDraft?: string;
   suggestedSteps?: string[];
+  marketAttractivenessScore?: number;
+  competitionIntensity?: string;
+  regulatoryComplexity?: string;
+  importGrowthTrend?: string;
+  tradeTrends?: {
+    summary: string;
+    demandDrivers?: string[];
+    consumerPreferences?: string;
+    pricingDynamics?: string;
+  };
+  swotAnalysis?: {
+    strengths: Array<{ title: string; detail: string; impact?: string }>;
+    weaknesses: Array<{ title: string; detail: string; risk?: string }>;
+    opportunities: Array<{ title: string; detail: string; potential?: string }>;
+    threats: Array<{ title: string; detail: string; mitigation?: string }>;
+  };
+  regulatoryAndTariffs?: {
+    tariffOverview: string;
+    standardsAndCertifications: string[];
+    customsClearanceAdvice?: string;
+  };
+  logisticsCorridor?: {
+    mainEntryPorts: string[];
+    transitTimes: string;
+    shippingAdvisory: string;
+  };
+  strategicRoadmap?: Array<{
+    phase: string;
+    action: string;
+    deliverable: string;
+  }>;
   content: string;
   source?: string;
 }
@@ -1409,5 +1440,42 @@ export interface CustomerAgentConfig {
   isCalendarConnected: boolean;
   updatedAt: string;
   createdAt: string;
+}
+
+export type MarketAlertTopic = 
+  | "market-demand"
+  | "export-opportunities"
+  | "tariffs-fta"
+  | "buyer-leads"
+  | "supply-chain";
+
+export interface MarketAlertSubscription {
+  id: string;
+  userId?: string;
+  email: string;
+  businessName?: string;
+  industry: string;
+  topics: MarketAlertTopic[];
+  targetRegions: string[];
+  frequency: "instant" | "daily" | "weekly";
+  keywords?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  lastDispatchedAt?: string;
+  nextDispatchAt?: string;
+}
+
+export interface MarketAlertFeedItem {
+  id: string;
+  title: string;
+  industry: string;
+  type: "trend" | "opportunity" | "tariff" | "lead" | "logistics";
+  region: string;
+  timestamp: string;
+  urgency: "HIGH" | "MEDIUM" | "URGENT";
+  summary: string;
+  impactScore: number;
+  details?: string;
 }
 

@@ -9,20 +9,22 @@ import {
   Mail, 
   Search, 
   ShieldAlert, 
-  Loader2,
-  Package,
-  Layers,
-  DollarSign,
-  TrendingUp,
-  ArrowUpRight,
-  AlertCircle,
-  RefreshCw,
-  Check,
-  ShieldCheck,
-  Truck,
-  CreditCard,
-  FileCheck2,
-  HelpCircle
+  Loader2, 
+  Package, 
+  Layers, 
+  DollarSign, 
+  TrendingUp, 
+  ArrowUpRight, 
+  AlertCircle, 
+  RefreshCw, 
+  Check, 
+  ShieldCheck, 
+  Truck, 
+  CreditCard, 
+  FileCheck2, 
+  HelpCircle,
+  Calculator,
+  Compass
 } from "lucide-react";
 import { SavedItem, ExportAnalysisResult } from "../types";
 import { normalizeErrorMessage } from "../utils/errorUtils";
@@ -30,6 +32,8 @@ import { authFetch } from "../utils/apiHelper";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
+import { ExportCostCalculator } from "./ExportCostCalculator";
+import { MarketIntelligenceReport } from "./MarketIntelligenceReport";
 
 interface ExportViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -44,8 +48,8 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
     openLimitModal 
   } = useCredits();
   const [activeSubTool, setActiveSubTool] = useState<
-    "opportunities" | "buyer-message" | "product-description" | "checklist" | "country-research" | "quotation-draft"
-  >("opportunities");
+    "market-intelligence" | "cost-calculator" | "opportunities" | "buyer-message" | "product-description" | "checklist" | "country-research" | "quotation-draft"
+  >("market-intelligence");
 
   // Form states matching user requirements
   const [productName, setProductName] = useState("Handmade Ceramic & Brass Decor");
@@ -207,42 +211,113 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
         </p>
       </div>
 
-      {/* Sub-tool navigation tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {[
-          { id: "opportunities", label: "Market Suitability", icon: TrendingUp },
-          { id: "buyer-message", label: "Buyer Message", icon: Mail },
-          { id: "product-description", label: "Product Spec Sheet", icon: FileText },
-          { id: "checklist", label: "Export Checklist", icon: CheckSquare },
-          { id: "country-research", label: "Country & Tariffs", icon: Search },
-          { id: "quotation-draft", label: "Quotation & Logistics", icon: DollarSign },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeSubTool === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveSubTool(tab.id as typeof activeSubTool);
-                if (tab.id !== "checklist") {
-                  handleRunExportAction(tab.id);
-                }
-              }}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all border shrink-0 ${
-                isActive
-                  ? "bg-blue-600/30 text-blue-200 border-blue-500/60 shadow-lg shadow-blue-500/10"
-                  : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border-slate-800"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Primary Category Switcher */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
+        <button
+          onClick={() => setActiveSubTool("market-intelligence")}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeSubTool === "market-intelligence"
+              ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-lg shadow-blue-500/25"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Compass className="w-4 h-4 text-cyan-300" />
+          <span className="truncate">Market Intelligence Report</span>
+          <span className="hidden md:inline px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 font-semibold uppercase">
+            SWOT &amp; Trends
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTool("cost-calculator")}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeSubTool === "cost-calculator"
+              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Calculator className="w-4 h-4 text-cyan-300" />
+          <span className="truncate">Cost/Profit Calculator</span>
+          <span className="hidden md:inline px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 font-semibold uppercase">
+            Shipping &amp; Tariffs
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (activeSubTool === "cost-calculator" || activeSubTool === "market-intelligence") {
+              setActiveSubTool("opportunities");
+              handleRunExportAction("opportunities");
+            }
+          }}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeSubTool !== "cost-calculator" && activeSubTool !== "market-intelligence"
+              ? "bg-slate-800 text-white border border-slate-700 shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Globe2 className="w-4 h-4 text-blue-300" />
+          <span className="truncate">Trade Tools &amp; Outreach</span>
+          <span className="hidden md:inline px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300 font-semibold">
+            6 Utilities
+          </span>
+        </button>
       </div>
 
-      {/* Interactive Export Checklist View */}
-      {activeSubTool === "checklist" ? (
+      {activeSubTool === "market-intelligence" ? (
+        <MarketIntelligenceReport
+          onSaveItem={onSaveItem}
+          defaultProduct={productName}
+          defaultOrigin={originCountry}
+          defaultDestination={targetCountry}
+        />
+      ) : activeSubTool === "cost-calculator" ? (
+        <ExportCostCalculator
+          onSaveItem={onSaveItem}
+          defaultProduct={productName}
+          defaultOrigin={originCountry}
+          defaultDestination={targetCountry}
+        />
+      ) : (
+        <>
+          {/* Sub-tool navigation tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { id: "market-intelligence", label: "Market Intelligence & SWOT", icon: Compass },
+              { id: "cost-calculator", label: "Cost & Profit Calculator", icon: Calculator },
+              { id: "opportunities", label: "Market Suitability", icon: TrendingUp },
+              { id: "buyer-message", label: "Buyer Message", icon: Mail },
+              { id: "product-description", label: "Product Spec Sheet", icon: FileText },
+              { id: "checklist", label: "Export Checklist", icon: CheckSquare },
+              { id: "country-research", label: "Country & Tariffs", icon: Search },
+              { id: "quotation-draft", label: "Quotation & Logistics", icon: DollarSign },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeSubTool === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveSubTool(tab.id as typeof activeSubTool);
+                    if (tab.id !== "checklist" && tab.id !== "cost-calculator" && tab.id !== "market-intelligence") {
+                      handleRunExportAction(tab.id);
+                    }
+                  }}
+                  className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all border shrink-0 ${
+                    isActive
+                      ? "bg-blue-600/30 text-blue-200 border-blue-500/60 shadow-lg shadow-blue-500/10"
+                      : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border-slate-800"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Interactive Export Checklist View */}
+          {activeSubTool === "checklist" ? (
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
@@ -619,7 +694,9 @@ export const ExportView: React.FC<ExportViewProps> = ({ onSaveItem }) => {
           </div>
         </div>
       )}
-    </div>
+    </>
+  )}
+</div>
   );
 };
 

@@ -15,7 +15,10 @@ import {
   Loader2,
   Check,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ListChecks,
+  Rocket,
+  Bell
 } from "lucide-react";
 import { SavedItem, ActiveTab } from "../types";
 import { BUSINESS_TOOLS_LIST } from "../data/mockData";
@@ -24,6 +27,8 @@ import { authFetch } from "../utils/apiHelper";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useCredits } from "../context/CreditsContext";
 import { AILanguageSelector } from "./AILanguageSelector";
+import { BusinessGrowthRoadmap } from "./BusinessGrowthRoadmap";
+import { MarketAlertsSubscription } from "./MarketAlertsSubscription";
 
 interface BusinessViewProps {
   onSaveItem: (item: Omit<SavedItem, "id" | "createdAt">) => void;
@@ -38,7 +43,7 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiv
     openSignupModal, 
     openLimitModal 
   } = useCredits();
-  const [selectedToolId, setSelectedToolId] = useState("pricing-calc");
+  const [selectedToolId, setSelectedToolId] = useState("growth-roadmap");
 
   // General form inputs
   const [inputField1, setInputField1] = useState("Handmade Brass Tableware");
@@ -178,6 +183,8 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiv
 
   const getIconForTool = (id: string) => {
     switch (id) {
+      case "growth-roadmap": return ListChecks;
+      case "market-alerts": return Bell;
       case "idea-gen": return Lightbulb;
       case "biz-plan": return FileSpreadsheet;
       case "mkt-plan": return Target;
@@ -205,51 +212,138 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiv
               Business Growth Tools
             </h1>
             <p className="text-xs text-slate-300 mt-1">
-              9 specialized commercial calculators, marketing plan creators, and strategic messaging generators.
+              Interactive milestone roadmaps, market trend email alerts, and commercial calculators.
             </p>
           </div>
 
-          {setActiveTab && (
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => setActiveTab("home")}
-              className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              onClick={() => {
+                setSelectedToolId("market-alerts");
+                setResultText(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Open Growth Operating System →</span>
+              <Bell className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Email Alerts Radar</span>
             </button>
-          )}
+
+            {setActiveTab && (
+              <button
+                onClick={() => setActiveTab("home")}
+                className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Open Growth OS →</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Tool Selector Carousel / Horizontal Scroll */}
-      <div className="space-y-2">
-        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider px-1">
-          Select Business Utility
-        </label>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {BUSINESS_TOOLS_LIST.map((tool) => {
-            const Icon = getIconForTool(tool.id);
-            const isSelected = selectedToolId === tool.id;
-            return (
-              <button
-                key={tool.id}
-                onClick={() => {
-                  setSelectedToolId(tool.id);
-                  setResultText(null);
-                }}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all border shrink-0 ${
-                  isSelected
-                    ? "bg-emerald-600/30 text-emerald-200 border-emerald-500/60 shadow-lg shadow-emerald-500/10"
-                    : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border-slate-800"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tool.name}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Primary Category Mode Switcher */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
+        <button
+          onClick={() => {
+            setSelectedToolId("growth-roadmap");
+            setResultText(null);
+          }}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            selectedToolId === "growth-roadmap"
+              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <ListChecks className="w-4 h-4 text-emerald-300" />
+          <span className="truncate">Growth Roadmap</span>
+          <span className="hidden md:inline px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-semibold uppercase">
+            Checklist
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setSelectedToolId("market-alerts");
+            setResultText(null);
+          }}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            selectedToolId === "market-alerts"
+              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/25"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Bell className="w-4 h-4 text-emerald-300" />
+          <span className="truncate">Market &amp; Export Alerts</span>
+          <span className="hidden md:inline px-2 py-0.5 rounded-full text-[10px] bg-teal-500/20 text-teal-300 font-semibold uppercase">
+            Email Radar
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (selectedToolId === "growth-roadmap" || selectedToolId === "market-alerts") {
+              setSelectedToolId("pricing-calc");
+            }
+            setResultText(null);
+          }}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            selectedToolId !== "growth-roadmap" && selectedToolId !== "market-alerts"
+              ? "bg-slate-800 text-white border border-slate-700 shadow-sm"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Calculator className="w-4 h-4 text-cyan-300" />
+          <span className="truncate">Commercial Utilities</span>
+          <span className="hidden md:inline px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300 font-semibold">
+            Calculators
+          </span>
+        </button>
       </div>
+
+      {/* Conditional: Growth Roadmap Generator vs Market Alerts vs Utility Tools */}
+      {selectedToolId === "growth-roadmap" ? (
+        <BusinessGrowthRoadmap 
+          onSaveItem={onSaveItem}
+          defaultBusinessName={inputField1 || "Aura Artisan Goods"}
+          defaultBusinessType={inputField2 || "Handicrafts & Manufacturing"}
+        />
+      ) : selectedToolId === "market-alerts" ? (
+        <MarketAlertsSubscription
+          initialBusinessName={inputField1 || "Aura Artisan Goods"}
+          initialIndustry="Handicrafts, Home Decor & Lifestyle"
+          onSaveItem={onSaveItem}
+        />
+      ) : (
+        <>
+          {/* Tool Selector Carousel / Horizontal Scroll */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider px-1">
+              Select Business Utility
+            </label>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {BUSINESS_TOOLS_LIST.map((tool) => {
+                const Icon = getIconForTool(tool.id);
+                const isSelected = selectedToolId === tool.id;
+                return (
+                  <button
+                    key={tool.id}
+                    onClick={() => {
+                      setSelectedToolId(tool.id);
+                      setResultText(null);
+                    }}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all border shrink-0 ${
+                      isSelected
+                        ? "bg-emerald-600/30 text-emerald-200 border-emerald-500/60 shadow-lg shadow-emerald-500/10"
+                        : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border-slate-800"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{tool.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
       {/* Dynamic Tool Form */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-xl space-y-4">
@@ -460,6 +554,8 @@ export const BusinessView: React.FC<BusinessViewProps> = ({ onSaveItem, setActiv
           </div>
         </div>
       )}
-    </div>
+    </>
+  )}
+</div>
   );
 };
